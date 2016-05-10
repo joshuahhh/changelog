@@ -11,80 +11,62 @@ import _ from 'underscore';
 
 export class TreeLayout {
   constructor(tree) {
-    this.tree = tree;
-    this.boxes = [];
-    this.boxesByLevel = [];
+    this.boxesById = {};
 
-    this.addSubtree(tree, 0, null);
+    this.addSubtree(tree, null);
   }
 
-  addSubtree(subtree, level, parentBox) {
-    if (!this.boxesByLevel[level]) {
-      this.boxesByLevel[level] = [];
-    }
+  addSubtree(subtree, parentId) {
+    var box = new Box(subtree.id, {width: 200, height: 100});
+    box.id = subtree.id;
+    box.parentId = parentId;
+    box.subtreeLeft = new c.Variable({});
+    box.subtreeRight = new c.Variable({});
 
-    var rootBox = new Box(subtree.name, {width: 200, height: 100});
-    rootBox.parentBox = parentBox;
-    rootBox.subtreeLeft = new c.Variable({});
-    rootBox.subtreeRight = new c.Variable({});
-
-    this.boxes.push(rootBox);
-    this.boxesByLevel[level].push(rootBox);
-
-    rootBox.children = (subtree.children || []).map((child) =>
-      this.addSubtree(child, level + 1, rootBox)
+    this.boxesById[box.id] = box;
+    box.childIds = (subtree.children || []).map((child) =>
+      this.addSubtree(child, box.id)
     );
 
-    return rootBox;
+    return box.id;
   }
 
   resolve() {
     var solver = new c.SimplexSolver();
-    window.solver = solver;
 
     var objectiveExpression = new c.Expression(0);
 
-    this.boxes.forEach((box) => {
+    _.each(this.boxesById, (box) => {
       box.getConstraints().forEach((constraint) => solver.addConstraint(constraint));
       solver.addConstraint(new c.Equation(box.width, 100));
       solver.addConstraint(new c.Equation(box.height, 50));
       solver.addConstraint(new c.Inequality(box.left, c.GEQ, 10));
       solver.addConstraint(new c.Inequality(box.top, c.GEQ, 10));
 
-      if (box.parentBox) {
+      if (box.parentId) {
+        const parentBox = this.boxesById[box.parentId];
         // Vertical constraint
-        solver.addConstraint(new c.Equation(box.top, c.plus(box.parentBox.bottom, 30)));
+        solver.addConstraint(new c.Equation(box.top, c.plus(parentBox.bottom, 30)));
         // Horizontal objective
         // objectiveExpression = addAbsoluteValueToObjective(objectiveExpression, box.centerX, box.parentBox.centerX, solver);
-        objectiveExpression = addPseudoQuadraticToObjective(objectiveExpression, box.centerX, box.parentBox.centerX, solver, 600, 200);
+        objectiveExpression = addPseudoQuadraticToObjective(objectiveExpression, box.centerX, parentBox.centerX, solver, 600, 200);
 
-        solver.addConstraint(new c.Inequality(box.parentBox.subtreeLeft, c.LEQ, box.subtreeLeft));
-        solver.addConstraint(new c.Inequality(box.subtreeRight, c.LEQ, box.parentBox.subtreeRight));
+        solver.addConstraint(new c.Inequality(parentBox.subtreeLeft, c.LEQ, box.subtreeLeft));
+        solver.addConstraint(new c.Inequality(box.subtreeRight, c.LEQ, parentBox.subtreeRight));
 
         solver.addConstraint(new c.Inequality(box.subtreeLeft, c.LEQ, box.left));
         solver.addConstraint(new c.Inequality(box.right, c.LEQ, box.subtreeRight));
       }
 
-      if (box.children) {
-        var lastBox = null;
-        box.children.forEach((box) => {
-          if (lastBox) {
-            solver.addConstraint(new c.Inequality(box.subtreeLeft, c.GEQ, c.plus(lastBox.subtreeRight, 10)));
-          }
-          lastBox = box;
-        })
-      }
+      var lastBox = null;
+      box.childIds.forEach((childId) => {
+        box = this.boxesById[childId];
+        if (lastBox) {
+          solver.addConstraint(new c.Inequality(box.subtreeLeft, c.GEQ, c.plus(lastBox.subtreeRight, 10)));
+        }
+        lastBox = box;
+      })
     });
-
-    // this.boxesByLevel.forEach((boxesInLevel) => {
-    //   var lastBox = null;
-    //   boxesInLevel.forEach((box) => {
-    //     if (lastBox) {
-    //       solver.addConstraint(new c.Inequality(box.left, c.GEQ, c.plus(lastBox.right, 10)));
-    //     }
-    //     lastBox = box;
-    //   });
-    // });
 
     var objectiveVariable = new c.Variable();
     solver.addConstraint(new c.Equation(objectiveVariable, objectiveExpression));

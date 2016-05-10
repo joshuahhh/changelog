@@ -1,56 +1,75 @@
 import React from 'react';
+import _ from 'underscore';
 
 import {Box} from '../Constraints';
 import {TreeLayout} from '../TreeLayout';
 // import {TreeLayout} from '../TreeLayoutN';
 
 const myTree = {
-  name: "Parent",
+  id: "Parent",
   children: [{
-    name: "Child 2",
+    id: "Child 2",
     children: [{
-      name: "Grandchild 2.1"
+      id: "Grandchild 2.1"
     }, {
-      name: "Grandchild 2.2"
+      id: "Grandchild 2.2"
     }, {
-      name: "Grandchild 2.3"
+      id: "Grandchild 2.3"
     }, {
-      name: "Grandchild 2.4",
+      id: "Grandchild 2.4",
       children: [{
-        name: "GGC 2.4.1"
+        id: "GGC 2.4.1"
       }, {
-        name: "GGC 2.4.2"
+        id: "GGC 2.4.2"
       }]
     }]
   }, {
-    name: "Child 3",
+    id: "Child 3",
     children: [{
-      name: "Grandchild 3.1",
+      id: "Grandchild 3.1",
       children: [{
-        name: "GGC 3.1.1"
+        id: "GGC 3.1.1"
       }, {
-        name: "GGC 3.1.2"
+        id: "GGC 3.1.2"
       }]
     }, {
-      name: "Grandchild 3.2"
+      id: "Grandchild 3.2"
     }, {
-      name: "Grandchild 3.3"
+      id: "Grandchild 3.3"
     }, {
-      name: "Grandchild 3.4"
+      id: "Grandchild 3.4"
     }]
   }]
-}
+};
 
-// const myTree = {
-//   name: "Parent",
-//   children: [{
-//     name: "Child 1"
-//   }, {
-//     name: "Child 2"
-//   }, {
-//     name: "Child 3"
-//   }]
-// }
+const myCrazyThing = {
+  rootBox: {
+    id: 'Group',
+    cloneBoxId: 'Group-cloning',
+    children: [{
+      id: 'Transform',
+      cloneBoxId: 'Group-cloning'
+    }, {
+      id: 'Smile',
+      cloneBoxId: 'Smile-cloning',
+      children: [{
+        id: 'Happiness',
+        cloneBoxId: 'Smile-cloning'
+      }, {
+        id: 'Circle',
+        cloneBoxId: 'Circle-cloning'
+      }]
+    }]
+  },
+  cloneBoxes: [{
+    id: 'Group-cloning'
+  }, {
+    id: 'Smile-cloning'
+  }, {
+    id: 'Circle-cloning',
+    parentId: 'Smile-cloning'
+  }]
+}
 
 const WigglyLine = ({x1, y1, x2, y2, ...otherProps}) =>
   <g>
@@ -76,18 +95,21 @@ var App = React.createClass({
         )}
         */}
         <svg width="1200" height="1000">
-          {treeLayout.boxes.map((box) =>
-            box.parentBox &&
-              <WigglyLine
-                x1={box.centerX.value} y1={box.centerY.value}
-                x2={box.parentBox.centerX.value} y2={box.parentBox.centerY.value}
-                stroke="black"
-              />
-          )}
-          {treeLayout.boxes.map((box) =>
+          {_.map(treeLayout.boxesById, (box) => {
+            if (box.parentId) {
+              const parentBox = treeLayout.boxesById[box.parentId];
+              return (
+                <WigglyLine
+                  x1={box.centerX.value} y1={box.centerY.value}
+                  x2={parentBox.centerX.value} y2={parentBox.centerY.value}
+                  stroke="black"
+                />);
+            }
+          })}
+          {_.map(treeLayout.boxesById, (box) =>
             <g transform={"translate(" + box.left.value + "," + box.top.value + ")"}>
               <rect width={box.width.value} height={box.height.value} fill="white" stroke="black"/>
-              <text x="5" y="20">{box.name}</text>
+              <text x="5" y="20">{box.id}</text>
             </g>
           )}
         </svg>
