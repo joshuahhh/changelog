@@ -23,7 +23,9 @@
   },
   "dependencies": {
     "bootstrap": "^3.3.5",
+    "cassowary": "git+https://git@github.com/slightlyoff/cassowary.js.git",
     "d3": "^3.5.6",
+    "numeric": "^1.2.6",
     "react": "^0.14.0-rc1",
     "react-dom": "^0.14.0-rc1",
     "underscore": "^1.8.3"
