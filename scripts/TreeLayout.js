@@ -25,13 +25,17 @@ export class TreeLayout {
 
     var rootBox = new Box(subtree.name, {width: 200, height: 100});
     rootBox.parentBox = parentBox;
+    rootBox.subtreeLeft = new c.Variable({});
+    rootBox.subtreeRight = new c.Variable({});
 
     this.boxes.push(rootBox);
     this.boxesByLevel[level].push(rootBox);
 
-    (subtree.children || []).forEach((child) =>
+    rootBox.children = (subtree.children || []).map((child) =>
       this.addSubtree(child, level + 1, rootBox)
     );
+
+    return rootBox;
   }
 
   resolve() {
@@ -53,18 +57,34 @@ export class TreeLayout {
         // Horizontal objective
         // objectiveExpression = addAbsoluteValueToObjective(objectiveExpression, box.centerX, box.parentBox.centerX, solver);
         objectiveExpression = addPseudoQuadraticToObjective(objectiveExpression, box.centerX, box.parentBox.centerX, solver, 600, 200);
+
+        solver.addConstraint(new c.Inequality(box.parentBox.subtreeLeft, c.LEQ, box.subtreeLeft));
+        solver.addConstraint(new c.Inequality(box.subtreeRight, c.LEQ, box.parentBox.subtreeRight));
+
+        solver.addConstraint(new c.Inequality(box.subtreeLeft, c.LEQ, box.left));
+        solver.addConstraint(new c.Inequality(box.right, c.LEQ, box.subtreeRight));
+      }
+
+      if (box.children) {
+        var lastBox = null;
+        box.children.forEach((box) => {
+          if (lastBox) {
+            solver.addConstraint(new c.Inequality(box.subtreeLeft, c.GEQ, c.plus(lastBox.subtreeRight, 10)));
+          }
+          lastBox = box;
+        })
       }
     });
 
-    this.boxesByLevel.forEach((boxesInLevel) => {
-      var lastBox = null;
-      boxesInLevel.forEach((box) => {
-        if (lastBox) {
-          solver.addConstraint(new c.Inequality(box.left, c.GEQ, c.plus(lastBox.right, 10)));
-        }
-        lastBox = box;
-      });
-    });
+    // this.boxesByLevel.forEach((boxesInLevel) => {
+    //   var lastBox = null;
+    //   boxesInLevel.forEach((box) => {
+    //     if (lastBox) {
+    //       solver.addConstraint(new c.Inequality(box.left, c.GEQ, c.plus(lastBox.right, 10)));
+    //     }
+    //     lastBox = box;
+    //   });
+    // });
 
     var objectiveVariable = new c.Variable();
     solver.addConstraint(new c.Equation(objectiveVariable, objectiveExpression));

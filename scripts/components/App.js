@@ -52,6 +52,13 @@ const myTree = {
 //   }]
 // }
 
+const WigglyLine = ({x1, y1, x2, y2, ...otherProps}) =>
+  <g>
+    <line x1={x1} y1={y1} x2={x1} y2={(y1 + y2) / 2} {...otherProps}/>
+    <line x1={x1} y1={(y1 + y2) / 2} x2={x2} y2={(y1 + y2) / 2} {...otherProps}/>
+    <line x1={x2} y1={(y1 + y2) / 2} x2={x2} y2={y2} {...otherProps}/>
+  </g>;
+
 var App = React.createClass({
   render() {
     var then = +(new Date());
@@ -68,10 +75,10 @@ var App = React.createClass({
           </pre>
         )}
         */}
-        <svg width="1000" height="1000">
+        <svg width="1200" height="1000">
           {treeLayout.boxes.map((box) =>
             box.parentBox &&
-              <line
+              <WigglyLine
                 x1={box.centerX.value} y1={box.centerY.value}
                 x2={box.parentBox.centerX.value} y2={box.parentBox.centerY.value}
                 stroke="black"
