@@ -40,9 +40,15 @@ export class SymbolDiagram {
   }
 }
 
-export const node = new SymbolDiagram([{id: 'node', childIds: []}], [], 'node');
+export const node =
+  new SymbolDiagram([{id: 'node', childIds: []}], [], 'node');
 
-export const transform = node.clone("transform");  // placeholder for fancier stuff
+export const attribute =
+  node.clone('attribute');
+
+export const transform =
+  node.clone('transform')
+  .appendChild('transform/node', attribute.clone('transform-attribute'));
 
 export const group =
   node.clone('group')
