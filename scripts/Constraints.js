@@ -60,7 +60,7 @@ export class Box extends VariableSet {
   }
 }
 
-export function addAbsoluteValueToObjective(objective, expr1, expr2, solver) {
+export function addAbsoluteValueToObjective(objective, expr1, expr2, solver, weight=1) {
   // console.log('addAbsoluteValueToObjective', objective, expr1, expr2, solver)
   const positivePart = new c.Variable();
   const negativePart = new c.Variable();
@@ -68,14 +68,14 @@ export function addAbsoluteValueToObjective(objective, expr1, expr2, solver) {
   solver.addConstraint(new c.Inequality(negativePart, c.GEQ, 0));
   solver.addConstraint(new c.Equation(expr1, c.plus(expr2, c.minus(positivePart, negativePart))));
 
-  var toReturn = c.plus(objective, c.plus(positivePart, negativePart));
+  var toReturn = c.plus(objective, c.times(c.plus(positivePart, negativePart), weight));
   // var toReturn = objective;
   return toReturn;
 }
 
-export function addPseudoQuadraticToObjective(objective, expr1, expr2, solver, halfRange, step) {
+export function addPseudoQuadraticToObjective(objective, expr1, expr2, solver, halfRange, step, weight=1) {
   _.range(-halfRange, halfRange + 0.001, step).forEach((x) =>
-    objective = addAbsoluteValueToObjective(objective, expr1, c.plus(expr2, x), solver)
+    objective = addAbsoluteValueToObjective(objective, expr1, c.plus(expr2, x), solver, weight)
   );
   return objective;
 }
