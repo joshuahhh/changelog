@@ -18,6 +18,10 @@ export class VariableSet {
   constructVariables(variableNames) {
     variableNames.map(this.constructVariable.bind(this));
   }
+
+  constrain(solver) {
+    this.getConstraints().forEach((constraint) => solver.addConstraint(constraint));
+  }
 }
 
 export class Box extends VariableSet {

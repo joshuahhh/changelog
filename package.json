@@ -28,6 +28,7 @@
     "d3": "^3.5.6",
     "numeric": "^1.2.6",
     "react": "^0.14.0-rc1",
+    "react-addons-update": "^15.0.2",
     "react-dom": "^0.14.0-rc1",
     "underscore": "^1.8.3"
   }
