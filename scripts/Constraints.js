@@ -1,3 +1,5 @@
+/* global c */
+
 import _ from 'underscore';
 
 export class VariableSet {
@@ -14,7 +16,7 @@ export class VariableSet {
   }
 
   constructVariables(variableNames) {
-    variableNames.map(this.constructVariable.bind(this))
+    variableNames.map(this.constructVariable.bind(this));
   }
 }
 
@@ -45,6 +47,13 @@ export class Box extends VariableSet {
       bottom: this.bottom.value
     };
   }
+
+  constrainToBeInside(otherBox, padding, solver) {
+    solver.addConstraint(new c.Inequality(this.top, c.GEQ, c.plus(otherBox.top, padding)));
+    solver.addConstraint(new c.Inequality(this.bottom, c.LEQ, c.plus(otherBox.bottom, -padding)));
+    solver.addConstraint(new c.Inequality(this.left, c.GEQ, c.plus(otherBox.left, padding)));
+    solver.addConstraint(new c.Inequality(this.right, c.LEQ, c.plus(otherBox.right, -padding)));
+  }
 }
 
 export function addAbsoluteValueToObjective(objective, expr1, expr2, solver) {
@@ -58,11 +67,11 @@ export function addAbsoluteValueToObjective(objective, expr1, expr2, solver) {
   var toReturn = c.plus(objective, c.plus(positivePart, negativePart));
   // var toReturn = objective;
   return toReturn;
-};
+}
 
 export function addPseudoQuadraticToObjective(objective, expr1, expr2, solver, halfRange, step) {
   _.range(-halfRange, halfRange + 0.001, step).forEach((x) =>
     objective = addAbsoluteValueToObjective(objective, expr1, c.plus(expr2, x), solver)
   );
   return objective;
-};
+}
