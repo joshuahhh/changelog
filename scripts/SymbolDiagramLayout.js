@@ -32,7 +32,7 @@ export class SymbolDiagramLayout {
       while (this.cloningsById[rootChain.rootId]) {
         rootChain = this.cloningsById[rootChain.rootId];
       }
-      cloning.underlyingNodeId = rootChain.rootId;
+      cloning.underlyingNodeId = rootChain.rootId || rootChain.id;
     });
   }
 
@@ -46,6 +46,10 @@ export class SymbolDiagramLayout {
     this.clonings.forEach((cloning) => {
       cloning.innerBox.constrain(solver);
       cloning.outerBox.constrain(solver);
+
+      ineq(cloning.innerBox.width, c.GEQ, options.nodeWidth);
+      ineq(cloning.innerBox.height, c.GEQ, options.nodeHeight);
+
 
       objectiveExpression = objectiveExpression.plus(cloning.innerBox.width);
 
@@ -64,11 +68,13 @@ export class SymbolDiagramLayout {
         // eq(cloning.innerBox.centerX, rootCloning.innerBox.centerX);
       } else {
         const rootNode = this.nodesById[cloning.rootId];
-        eq(cloning.innerBox.top, rootNode.box.top);
-        // eq(cloning.innerBox.centerX, rootNode.box.centerX);
-        ineq(rootNode.box.left, c.GEQ, c.plus(cloning.innerBox.left, options.paddingBetweenClonings));
-        ineq(rootNode.box.right, c.LEQ, c.plus(cloning.innerBox.right, -options.paddingBetweenClonings));
-        ineq(rootNode.box.bottom, c.LEQ, c.plus(cloning.innerBox.bottom, -options.paddingBetweenClonings));
+        if (rootNode) {
+          eq(cloning.innerBox.top, rootNode.box.top);
+          // eq(cloning.innerBox.centerX, rootNode.box.centerX);
+          ineq(rootNode.box.left, c.GEQ, c.plus(cloning.innerBox.left, options.paddingBetweenClonings));
+          ineq(rootNode.box.right, c.LEQ, c.plus(cloning.innerBox.right, -options.paddingBetweenClonings));
+          ineq(rootNode.box.bottom, c.LEQ, c.plus(cloning.innerBox.bottom, -options.paddingBetweenClonings));
+        }
       }
 
       const ownerCloning = this.cloningsById[cloning.ownerId];
@@ -93,14 +99,22 @@ export class SymbolDiagramLayout {
       var lastChild = null;
       node.childIds.forEach((childId) => {
         const child = this.cloningsById[childId];
-        const underlyingNode = this.nodesById[child.underlyingNodeId];
 
         ineq(c.plus(node.box.bottom, 2 * options.verticalSpacing), c.LEQ, child.outerBox.top);
         objectiveExpression = objectiveExpression.plus(c.minus(child.outerBox.top, node.box.bottom));
 
-        objectiveExpression = addPseudoQuadraticToObjective(
-          objectiveExpression,
-          node.box.centerX, underlyingNode.box.centerX, solver, 600, 50);
+        console.log(child.id, child.underlyingNodeId);
+        const underlyingNode = this.nodesById[child.underlyingNodeId];
+        if (underlyingNode) {
+          objectiveExpression = addPseudoQuadraticToObjective(
+            objectiveExpression,
+            node.box.centerX, underlyingNode.box.centerX, solver, 600, 50);
+        } else {
+          const underlyingCloning = this.cloningsById[child.underlyingNodeId];
+          objectiveExpression = addPseudoQuadraticToObjective(
+            objectiveExpression,
+            node.box.centerX, underlyingCloning.innerBox.centerX, solver, 600, 50);
+        }
 
         // Climb up the parent's owner hierarchy.
         var ownerChain = this.cloningsByRootId[node.id];
