@@ -1,47 +1,59 @@
 // import _ from 'underscore';
 import update from 'react-addons-update';
 
+export const byType = (funcForEachType) => (obj) => funcForEachType[obj.type](obj);
 
 export class SymbolDiagram {
-  constructor(nodes, clonings, rootCloningId) {
-    this.nodes = nodes;
-    this.clonings = clonings;
-    this.rootCloningId = rootCloningId;
+  constructor(blocks, rootId) {
+    this.blocks = blocks;
+    this.rootId = rootId;
   }
 
   clone(cloningId) {
-    const idFunc = (id) => id ? cloningId + '/' + id : cloningId;
+    const idFunc = (id) => id ? cloningId + '/' + id : null;
+    const idFuncWithDefault = (id) => id ? cloningId + '/' + id : cloningId;
 
     const newRootCloning = {
+      type: 'cloning',
       id: cloningId,
-      rootId: idFunc(this.rootCloningId),
+      rootId: idFunc(this.rootId),
       ownerId: null
     };
 
-    const newNodes = this.nodes.map((node) =>
-      update(node, {id: {$apply: idFunc}, childIds: {$apply: (l) => l.map(idFunc)}})
-    );
-    const newClonings = this.clonings.map((node) =>
-      update(node, {id: {$apply: idFunc}, rootId: {$apply: idFunc}, ownerId: {$apply: idFunc}})
-    ).concat([newRootCloning]);
-    return new SymbolDiagram(newNodes, newClonings, newRootCloning.id);
+    const newBlocks = this.blocks.map(byType({
+      node: (node) =>
+        update(node, {
+          id: {$apply: idFunc},
+          ownerId: {$apply: idFuncWithDefault},
+          childIds: {$apply: (l) => l.map(idFunc)}}),
+      cloning: (cloning) =>
+        update(cloning, {
+          id: {$apply: idFunc},
+          ownerId: {$apply: idFuncWithDefault},
+          rootId: {$apply: idFunc}})
+    })).concat([newRootCloning]);
+
+    return new SymbolDiagram(newBlocks, newRootCloning.id);
   }
 
   appendChild(parentId, child) {
-    const newNodes = this.nodes.map((node) => {
-      if (node.id == parentId) {
-        return update(node, {childIds: {$push: [child.rootCloningId]}});
-      } else {
-        return node;
-      }
-    }).concat(child.nodes);
-    const newClonings = this.clonings.concat(child.clonings);
-    return new SymbolDiagram(newNodes, newClonings, this.rootCloningId);
+    const newBlocks = this.blocks.map(byType({
+      node: (node) => {
+        if (node.id == parentId) {
+          return update(node, {childIds: {$push: [child.rootId]}});
+        } else {
+          return node;
+        }
+      },
+      cloning: (cloning) => cloning
+    })).concat(child.blocks);
+
+    return new SymbolDiagram(newBlocks, this.rootId);
   }
 }
 
 export const node =
-  new SymbolDiagram([{id: 'node', childIds: []}], [], 'node');
+  new SymbolDiagram([{type: 'node', id: 'node', childIds: []}], 'node');
 
 export const attribute =
   node.clone('attribute');

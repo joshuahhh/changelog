@@ -1,5 +1,6 @@
 /* global c */
 
+import {byType} from './SymbolDiagram';
 import {Box, addPseudoQuadraticToObjective, addAbsoluteValueToObjective} from './Constraints';
 import _ from 'underscore';
 
@@ -13,27 +14,28 @@ const options = {
 
 export class SymbolDiagramLayout {
   constructor(symbolDiagram) {
-    _.extend(this, _.pick(symbolDiagram, 'nodes', 'clonings', 'rootCloningId'));
-    this.nodesById = _.indexBy(this.nodes, 'id');
-    this.cloningsById = _.indexBy(this.clonings, 'id');
-    this.cloningsByRootId = _.indexBy(this.clonings, 'rootId');
+    _.extend(this, _.pick(symbolDiagram, 'blocks', 'rootCloningId'));
+    this.blocksById = _.indexBy(this.blocks, 'id');
+    // this.cloningsByRootId = _.indexBy(_.where(this.blocks, {type: 'cloning'}), 'rootId');
 
-    this.nodes.forEach((node) => {
-      node.box = new Box(node.id, {width: options.nodeWidth, height: options.nodeHeight});
-      node.subtreeLeft = new c.Variable();
-      node.subtreeRight = new c.Variable();
-    });
+    this.blocks.forEach(byType({
+      node: (node) => {
+        node.outerBox = new Box(node.id + '-outer');
 
-    this.clonings.forEach((cloning) => {
-      cloning.innerBox = new Box(cloning.id);
-      cloning.outerBox = new Box(cloning.id);
+        node.subtreeLeft = new c.Variable(node.id + '-subtreeLeft');
+        node.subtreeRight = new c.Variable(node.id + '-subtreeRight');
+      },
+      cloning: (cloning) => {
+        cloning.outerBox = new Box(cloning.id + '-outer');
+        cloning.innerBox = new Box(cloning.id + '-inner');
 
-      var rootChain = cloning;
-      while (this.cloningsById[rootChain.rootId]) {
-        rootChain = this.cloningsById[rootChain.rootId];
+        var rootChain = cloning;
+        while (rootChain.rootId) {
+          rootChain = this.blocksById[rootChain.rootId];
+        }
+        cloning.deepestRootId = rootChain.id;
       }
-      cloning.underlyingNodeId = rootChain.rootId || rootChain.id;
-    });
+    }));
   }
 
   resolve() {
@@ -43,92 +45,85 @@ export class SymbolDiagramLayout {
     const eq = (x, y) => solver.addConstraint(new c.Equation(x, y));
     const ineq = (x, r, y) => solver.addConstraint(new c.Inequality(x, r, y));
 
-    this.clonings.forEach((cloning) => {
-      cloning.innerBox.constrain(solver);
-      cloning.outerBox.constrain(solver);
+    this.blocks.forEach(byType({
+      node: (node) => {
+        const box = node.outerBox;
 
-      ineq(cloning.innerBox.width, c.GEQ, options.nodeWidth);
-      ineq(cloning.innerBox.height, c.GEQ, options.nodeHeight);
+        box.constrain(solver);
 
+        eq(box.width, options.nodeWidth);
+        eq(box.height, options.nodeHeight);
 
-      objectiveExpression = objectiveExpression.plus(cloning.innerBox.width);
+        ineq(box.left, c.GEQ, 20);
+        ineq(box.top, c.GEQ, 20);
 
-      ineq(cloning.outerBox.left, c.GEQ, 20);
-      ineq(cloning.outerBox.top, c.GEQ, 20);
+        var lastChild = null;
+        node.childIds.forEach((childId) => {
+          const child = this.blocksById[childId];
+          // const doIt = (child.id == 'Bottom-Group');
+          // doIt && console.log('do it!');
 
-      eq(cloning.innerBox.left, cloning.outerBox.left);
-      eq(cloning.innerBox.top, cloning.outerBox.top);
-      eq(cloning.innerBox.bottom, cloning.outerBox.bottom);
-      const cloningLabelWidth = 10 + cloning.id.length * 4;
-      eq(c.plus(cloning.innerBox.right, cloningLabelWidth), cloning.outerBox.right);
+          ineq(c.plus(box.bottom, 2 * options.verticalSpacing), c.LEQ, child.outerBox.top);
+          objectiveExpression = objectiveExpression.plus(c.minus(child.outerBox.top, box.bottom));
 
-      const rootCloning = this.cloningsById[cloning.rootId];
-      if (rootCloning) {
-        eq(cloning.innerBox.top, rootCloning.innerBox.top);
-        // eq(cloning.innerBox.centerX, rootCloning.innerBox.centerX);
-      } else {
-        const rootNode = this.nodesById[cloning.rootId];
-        if (rootNode) {
-          eq(cloning.innerBox.top, rootNode.box.top);
-          // eq(cloning.innerBox.centerX, rootNode.box.centerX);
-          ineq(rootNode.box.left, c.GEQ, c.plus(cloning.innerBox.left, options.paddingBetweenClonings));
-          ineq(rootNode.box.right, c.LEQ, c.plus(cloning.innerBox.right, -options.paddingBetweenClonings));
-          ineq(rootNode.box.bottom, c.LEQ, c.plus(cloning.innerBox.bottom, -options.paddingBetweenClonings));
-        }
-      }
-
-      const ownerCloning = this.cloningsById[cloning.ownerId];
-      if (ownerCloning) {
-        ineq(cloning.outerBox.top, c.GEQ, ownerCloning.innerBox.top);
-        ineq(cloning.outerBox.left, c.GEQ, c.plus(ownerCloning.innerBox.left, options.paddingBetweenClonings));
-        ineq(cloning.outerBox.right, c.LEQ, c.plus(ownerCloning.innerBox.right, -options.paddingBetweenClonings));
-        ineq(cloning.outerBox.bottom, c.LEQ, c.plus(ownerCloning.innerBox.bottom, -options.paddingBetweenClonings));
-      }
-    });
-
-    this.nodes.forEach((node) => {
-      node.box.constrain(solver);
-
-      eq(node.box.width, options.nodeWidth);
-      eq(node.box.height, options.nodeHeight);
-
-      ineq(node.box.left, c.GEQ, 20);
-      ineq(node.box.top, c.GEQ, 20);
-
-
-      var lastChild = null;
-      node.childIds.forEach((childId) => {
-        const child = this.cloningsById[childId];
-
-        ineq(c.plus(node.box.bottom, 2 * options.verticalSpacing), c.LEQ, child.outerBox.top);
-        objectiveExpression = objectiveExpression.plus(c.minus(child.outerBox.top, node.box.bottom));
-
-        console.log(child.id, child.underlyingNodeId);
-        const underlyingNode = this.nodesById[child.underlyingNodeId];
-        if (underlyingNode) {
+          const deepestRoot = this.blocksById[child.deepestRootId];
+          // TODO: get rid of this if a node gets an innerBox
+          const deepestRootBox = deepestRoot.innerBox || deepestRoot.outerBox;
           objectiveExpression = addPseudoQuadraticToObjective(
             objectiveExpression,
-            node.box.centerX, underlyingNode.box.centerX, solver, 600, 50);
-        } else {
-          const underlyingCloning = this.cloningsById[child.underlyingNodeId];
-          objectiveExpression = addPseudoQuadraticToObjective(
-            objectiveExpression,
-            node.box.centerX, underlyingCloning.innerBox.centerX, solver, 600, 50);
+            box.centerX, deepestRootBox.centerX, solver, 600, 50);
+
+          // Climb up the parent's owner hierarchy.
+          var ownerChain = this.blocksById[node.ownerId];
+          while (ownerChain && child.ownerId !== ownerChain.id) {
+            ineq(c.plus(ownerChain.outerBox.bottom, options.verticalSpacing * 2), c.LEQ, child.outerBox.top);
+            ownerChain = this.blocksById[ownerChain.ownerId];
+          }
+
+          if (lastChild) {
+            ineq(child.outerBox.left, c.GEQ, c.plus(lastChild.outerBox.right, 10));
+          }
+          lastChild = child;
+        });
+      },
+      cloning: (cloning) => {
+        const {outerBox, innerBox} = cloning;
+
+        outerBox.constrain(solver);
+        innerBox.constrain(solver);
+
+        ineq(innerBox.width, c.GEQ, options.nodeWidth);
+        ineq(innerBox.height, c.GEQ, options.nodeHeight);
+
+        objectiveExpression = objectiveExpression.plus(innerBox.width);
+        objectiveExpression = objectiveExpression.plus(innerBox.height);
+
+        ineq(outerBox.left, c.GEQ, 20);
+        ineq(outerBox.top, c.GEQ, 20);
+
+        eq(innerBox.left, outerBox.left);
+        eq(innerBox.top, outerBox.top);
+        eq(innerBox.bottom, outerBox.bottom);
+        const cloningLabelWidth = 10 + cloning.id.length * 4;
+        eq(c.plus(innerBox.right, cloningLabelWidth), outerBox.right);
+
+        const root = this.blocksById[cloning.rootId];
+        if (root) {
+          eq(root.outerBox.top, innerBox.top);
+          ineq(root.outerBox.left, c.GEQ, c.plus(innerBox.left, options.paddingBetweenClonings));
+          ineq(root.outerBox.right, c.LEQ, c.plus(innerBox.right, -options.paddingBetweenClonings));
+          ineq(root.outerBox.bottom, c.LEQ, c.plus(innerBox.bottom, -options.paddingBetweenClonings));
         }
 
-        // Climb up the parent's owner hierarchy.
-        var ownerChain = this.cloningsByRootId[node.id];
-        while (ownerChain && child.ownerId !== ownerChain.id) {
-          ineq(c.plus(ownerChain.outerBox.bottom, options.verticalSpacing * 5), c.LEQ, child.outerBox.top);
-          ownerChain = this.cloningsById[ownerChain.ownerId];
+        const ownerCloning = this.blocksById[cloning.ownerId];
+        if (ownerCloning) {
+          ineq(cloning.outerBox.top, c.GEQ, ownerCloning.innerBox.top);
+          ineq(cloning.outerBox.left, c.GEQ, c.plus(ownerCloning.innerBox.left, options.paddingBetweenClonings));
+          ineq(cloning.outerBox.right, c.LEQ, c.plus(ownerCloning.innerBox.right, -options.paddingBetweenClonings));
+          ineq(cloning.outerBox.bottom, c.LEQ, c.plus(ownerCloning.innerBox.bottom, -options.paddingBetweenClonings));
         }
-
-        if (lastChild) {
-          ineq(child.outerBox.left, c.GEQ, c.plus(lastChild.outerBox.right, 10));
-        }
-        lastChild = child;
-      });
-    });
+      }
+    }));
 
     var objectiveVariable = new c.Variable();
     solver.addConstraint(new c.Equation(objectiveVariable, objectiveExpression));
