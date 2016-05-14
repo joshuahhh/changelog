@@ -52,7 +52,7 @@ appendChildToBlockWhichMustBeNode childId block =
     oldNodeBody = case block.body of
       NodeBodyAsBlockBody oldNodeBody -> oldNodeBody
       _ -> Debug.crash "you can only add a child to a node!"
-    newBody = NodeBodyAsBlockBody { oldNodeBody | childIds = childId :: oldNodeBody.childIds }
+    newBody = NodeBodyAsBlockBody { oldNodeBody | childIds = List.append oldNodeBody.childIds [childId] }
   in
     { block | body = newBody }
 
@@ -66,14 +66,19 @@ setRootOfBlockWhichMustBeCloning rootId block =
   in
     { block | body = newBody }
 
-runChangeInSymbolRendering : SymbolRendering -> Maybe BlockId -> Change -> SymbolRendering
-runChangeInSymbolRendering symbolRendering maybeBlockId change =
+type alias ChangeInContext =
+  { change : Change
+  , contextId : Maybe BlockId
+  }
+
+runChangeInContext : ChangeInContext -> SymbolRendering -> SymbolRendering
+runChangeInContext {change, contextId} symbolRendering =
   case change of
     SetRoot cloning ->
       let
-        newBlock = cloningToBlock cloning maybeBlockId
+        newBlock = cloningToBlock cloning contextId
         newBlocks = newBlock ::
-          case maybeBlockId of
+          case contextId of
             Just blockId ->
               mapWhen
                 (idIs blockId)
@@ -82,19 +87,19 @@ runChangeInSymbolRendering symbolRendering maybeBlockId change =
             Nothing ->
               symbolRendering.blocks
         newRootId =
-          case maybeBlockId of
+          case contextId of
             Just blockId -> symbolRendering.rootId
             Nothing -> Just cloning.id
       in
         { symbolRendering | blocks = newBlocks, rootId = newRootId }
     AppendChild nodeId cloning ->
       let
-        newBlock = cloningToBlock cloning maybeBlockId
-        blockIdOfParent = constructBlockId maybeBlockId nodeId
+        newBlock = cloningToBlock cloning contextId
+        blockIdOfParent = constructBlockId contextId nodeId
         newBlocks = newBlock ::
           mapWhen
             (idIs blockIdOfParent)
-            (appendChildToBlockWhichMustBeNode (constructBlockId maybeBlockId cloning.id))
+            (appendChildToBlockWhichMustBeNode (constructBlockId contextId cloning.id))
             symbolRendering.blocks
         newRootId = Just cloning.id
       in
@@ -128,41 +133,31 @@ jsonEncodeMaybeString : Maybe String -> Json.Encode.Value
 jsonEncodeMaybeString maybeString =
   Maybe.map Json.Encode.string maybeString |> Maybe.withDefault Json.Encode.null
 
-blockWithNodeBodyToThatJsonFormatIUse : Block -> NodeBody -> Json.Encode.Value
-blockWithNodeBodyToThatJsonFormatIUse block nodeBody =
-  Json.Encode.object
-  [ ( "id", Json.Encode.string block.id )
-  , ( "childIds", Json.Encode.list (List.map Json.Encode.string nodeBody.childIds) )
-  ]
 
-blockWithCloningBodyToThatJsonFormatIUse : Block -> CloningBody -> Json.Encode.Value
-blockWithCloningBodyToThatJsonFormatIUse block cloningBody =
-  Json.Encode.object
-  [ ( "id", Json.Encode.string block.id )
-  , ( "ownerId", jsonEncodeMaybeString block.ownerId )
-  , ( "rootId", jsonEncodeMaybeString cloningBody.rootId )
-  ]
+blockToThatJsonFormatIUse : Block -> Json.Encode.Value
+blockToThatJsonFormatIUse {id, ownerId, body} =
+  Json.Encode.object (
+    case body of
+      NodeBodyAsBlockBody {childIds} ->
+        [ ( "type", Json.Encode.string "node" )
+        , ( "id", Json.Encode.string id )
+        , ( "ownerId", jsonEncodeMaybeString ownerId )
+        , ( "childIds", Json.Encode.list (List.map Json.Encode.string childIds) )
+        ]
+      CloningBodyAsBlockBody {rootId} ->
+        [ ( "type", Json.Encode.string "cloning" )
+        , ( "id", Json.Encode.string id )
+        , ( "ownerId", jsonEncodeMaybeString ownerId )
+        , ( "rootId", jsonEncodeMaybeString rootId )
+        ])
+
 
 symbolRenderingToThatJsonFormatIUse : SymbolRendering -> Json.Encode.Value
 symbolRenderingToThatJsonFormatIUse symbolRendering =
   let
-    nodeValues = List.filterMap
-      (\block -> case block.body of
-        NodeBodyAsBlockBody nodeBody ->
-          Just (blockWithNodeBodyToThatJsonFormatIUse block nodeBody)
-        _ ->
-          Nothing)
-      symbolRendering.blocks
-    cloningValues = List.filterMap
-      (\block -> case block.body of
-        CloningBodyAsBlockBody cloningBody ->
-          Just (blockWithCloningBodyToThatJsonFormatIUse block cloningBody)
-        _ ->
-          Nothing)
-      symbolRendering.blocks
+    blockValues = List.map blockToThatJsonFormatIUse symbolRendering.blocks
   in
     Json.Encode.object
-    [ ( "nodes", Json.Encode.list nodeValues )
-    , ( "clonings", Json.Encode.list cloningValues )
-    , ( "rootCloningId", jsonEncodeMaybeString symbolRendering.rootId)
+    [ ( "blocks", Json.Encode.list blockValues )
+    , ( "rootId", jsonEncodeMaybeString symbolRendering.rootId)
     ]

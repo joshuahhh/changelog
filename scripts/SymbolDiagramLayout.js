@@ -8,7 +8,7 @@ const options = {
   nodeWidth: 60,
   nodeHeight: 30,
   cloningLabelWidth: 150,
-  verticalSpacing: 10,
+  verticalSpacing: 20,
   paddingBetweenClonings: 10,
 };
 
@@ -55,7 +55,7 @@ export class SymbolDiagramLayout {
         eq(box.height, options.nodeHeight);
 
         ineq(box.left, c.GEQ, 20);
-        ineq(box.top, c.GEQ, 20);
+        ineq(box.top, c.GEQ, 1);
 
         var lastChild = null;
         node.childIds.forEach((childId) => {
@@ -99,7 +99,7 @@ export class SymbolDiagramLayout {
         objectiveExpression = objectiveExpression.plus(innerBox.height);
 
         ineq(outerBox.left, c.GEQ, 20);
-        ineq(outerBox.top, c.GEQ, 20);
+        ineq(outerBox.top, c.GEQ, 2);
 
         eq(innerBox.left, outerBox.left);
         eq(innerBox.top, outerBox.top);

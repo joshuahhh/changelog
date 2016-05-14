@@ -7,7 +7,7 @@ import Array
 
 import Util exposing ( force )
 import SymbolRendering exposing (
-  SymbolRendering, runChangeInSymbolRendering, BlockId, BlockBody(..), Block,
+  SymbolRendering, runChangeInContext, ChangeInContext, BlockId, BlockBody(..), Block,
   symbolRenderingToThatJsonFormatIUse)
 import Symbol exposing ( myEnvironment, Change(..), SymbolRef(..), CompoundSymbol )
 
@@ -18,58 +18,56 @@ group = force (Dict.get "Group" myEnvironment.symbols)
 transform : CompoundSymbol
 transform = force (Dict.get "Transform" myEnvironment.symbols)
 
+initialSymbolRendering : SymbolRendering
+initialSymbolRendering = { blocks = [], rootId = Nothing }
 
-symbolRendering0 : SymbolRendering
-symbolRendering0 = { blocks = [], rootId = Nothing }
+changesInContext : List ChangeInContext
+changesInContext =
+  [ { contextId = Nothing
+    , change =
+        SetRoot
+          { id = "1"
+          , symbolRef = SymbolIdAsRef "Group"
+          }
+    }
+  , { contextId = Just "1"
+    , change = force (Array.get 0 group.changes)
+    }
+  , { contextId = Just "1"
+    , change = force (Array.get 1 group.changes)
+    }
+  , { contextId = Just "1/transform"
+    , change = force (Array.get 0 transform.changes)
+    }
+  , { contextId = Nothing
+    , change =
+        AppendChild
+          "1/node"
+          { id = "2"
+          , symbolRef = SymbolIdAsRef "Group"
+          }
+    }
+  , { contextId = Just "2"
+    , change = force (Array.get 0 group.changes)
+    }
+  , { contextId = Just "2"
+    , change = force (Array.get 1 group.changes)
+    }
+  , { contextId = Just "2/transform"
+    , change = force (Array.get 0 transform.changes)
+    }
+  ]
 
-symbolRendering1 : SymbolRendering
-symbolRendering1 =
-  runChangeInSymbolRendering
-    symbolRendering0
-    Nothing
-    (SetRoot
-      { id = "1"
-      , symbolRef = SymbolIdAsRef "Group"
-      }
-    )
+symbolRenderings : List SymbolRendering
+symbolRenderings = List.scanl runChangeInContext initialSymbolRendering changesInContext
 
-symbolRendering2 : SymbolRendering
-symbolRendering2 =
-  runChangeInSymbolRendering
-    symbolRendering1
-    (Just "1")
-    (force (Array.get 0 group.changes))
-
-symbolRendering3 : SymbolRendering
-symbolRendering3 =
-  runChangeInSymbolRendering
-    symbolRendering2
-    (Just "1")
-    (force (Array.get 1 group.changes))
-
-symbolRendering4 : SymbolRendering
-symbolRendering4 =
-  runChangeInSymbolRendering
-    symbolRendering3
-    (Just "1/transform")
-    (force (Array.get 0 transform.changes))
-
-finalSymbolRendering : SymbolRendering
-finalSymbolRendering = symbolRendering4
-
-finalJsonFormatIUse : Json.Encode.Value
-finalJsonFormatIUse = symbolRenderingToThatJsonFormatIUse finalSymbolRendering
+symbolRenderingsInJson : Json.Encode.Value
+symbolRenderingsInJson = Json.Encode.list (List.map symbolRenderingToThatJsonFormatIUse symbolRenderings)
 
 main : Html.Html
 main =
   Html.div []
-  [ Html.pre []
-      [ Html.text (Json.Encode.encode 4 (symbolRenderingToThatJsonFormatIUse symbolRendering1)) ]
-  , Html.pre []
-      [ Html.text (Json.Encode.encode 4 (symbolRenderingToThatJsonFormatIUse symbolRendering2)) ]
-  , Html.pre []
-      [ Html.text (Json.Encode.encode 4 (symbolRenderingToThatJsonFormatIUse symbolRendering3)) ]
-  , Html.pre []
-      [ Html.text (Json.Encode.encode 4 (symbolRenderingToThatJsonFormatIUse symbolRendering4)) ]
-  ]
-  -- text (toString finalSymbolRendering)
+    [ Html.pre [] [ Html.text (Json.Encode.encode 4 symbolRenderingsInJson) ] ]
+    -- (List.map
+    --   (\j -> Html.pre [] [ Html.text (Json.Encode.encode 4 j) ])
+    --   symbolRenderingsInJson)
