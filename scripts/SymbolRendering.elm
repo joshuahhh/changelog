@@ -16,6 +16,7 @@ type alias BlockId = String
 
 type alias Block =
   { id : BlockId
+  , localId : BlockId
   , ownerId : Maybe BlockId
   , body : BlockBody
   }
@@ -44,7 +45,7 @@ cloningToBlock cloning maybeOwnerId =
       SymbolIdAsRef symbolId ->
         CloningBodyAsBlockBody { rootId = Nothing, symbolId = symbolId, nextChange = 0 }
   in
-    Block newId maybeOwnerId newBody
+    Block newId cloning.id maybeOwnerId newBody
 
 appendChildToBlockWhichMustBeNode : BlockId -> Block -> Block
 appendChildToBlockWhichMustBeNode childId block =
@@ -135,19 +136,19 @@ jsonEncodeMaybeString maybeString =
 
 
 blockToThatJsonFormatIUse : Block -> Json.Encode.Value
-blockToThatJsonFormatIUse {id, ownerId, body} =
+blockToThatJsonFormatIUse {id, localId, ownerId, body} =
   Json.Encode.object (
+    [ ( "id", Json.Encode.string id )
+    , ( "localId", Json.Encode.string localId )
+    , ( "ownerId", jsonEncodeMaybeString ownerId )
+    ] ++
     case body of
       NodeBodyAsBlockBody {childIds} ->
         [ ( "type", Json.Encode.string "node" )
-        , ( "id", Json.Encode.string id )
-        , ( "ownerId", jsonEncodeMaybeString ownerId )
         , ( "childIds", Json.Encode.list (List.map Json.Encode.string childIds) )
         ]
       CloningBodyAsBlockBody {rootId} ->
         [ ( "type", Json.Encode.string "cloning" )
-        , ( "id", Json.Encode.string id )
-        , ( "ownerId", jsonEncodeMaybeString ownerId )
         , ( "rootId", jsonEncodeMaybeString rootId )
         ])
 

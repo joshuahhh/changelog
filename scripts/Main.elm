@@ -56,6 +56,14 @@ changesInContext =
   , { contextId = Just "2/transform"
     , change = force (Array.get 0 transform.changes)
     }
+  , { contextId = Nothing
+    , change =
+        AppendChild
+          "1/transform/node"
+          { id = "3"
+          , symbolRef = SymbolIdAsRef "Group"
+          }
+    }
   ]
 
 symbolRenderings : List SymbolRendering

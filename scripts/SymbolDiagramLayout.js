@@ -4,17 +4,19 @@ import {byType} from './SymbolDiagram';
 import {Box, addPseudoQuadraticToObjective, addAbsoluteValueToObjective} from './Constraints';
 import _ from 'underscore';
 
-const options = {
+const defaultOptions = {
   nodeWidth: 60,
   nodeHeight: 30,
   cloningLabelWidth: 150,
   verticalSpacing: 20,
   paddingBetweenClonings: 10,
+  cloningLabelExtractor: (cloning) => cloning.localId,
 };
 
 export class SymbolDiagramLayout {
-  constructor(symbolDiagram) {
+  constructor(symbolDiagram, options={}) {
     _.extend(this, _.pick(symbolDiagram, 'blocks', 'rootCloningId'));
+    this.options = _.defaults(options, defaultOptions);
     this.blocksById = _.indexBy(this.blocks, 'id');
     // this.cloningsByRootId = _.indexBy(_.where(this.blocks, {type: 'cloning'}), 'rootId');
 
@@ -51,8 +53,8 @@ export class SymbolDiagramLayout {
 
         box.constrain(solver);
 
-        eq(box.width, options.nodeWidth);
-        eq(box.height, options.nodeHeight);
+        eq(box.width, this.options.nodeWidth);
+        eq(box.height, this.options.nodeHeight);
 
         ineq(box.left, c.GEQ, 20);
         ineq(box.top, c.GEQ, 1);
@@ -63,7 +65,7 @@ export class SymbolDiagramLayout {
           // const doIt = (child.id == 'Bottom-Group');
           // doIt && console.log('do it!');
 
-          ineq(c.plus(box.bottom, 2 * options.verticalSpacing), c.LEQ, child.outerBox.top);
+          ineq(c.plus(box.bottom, 2 * this.options.verticalSpacing), c.LEQ, child.outerBox.top);
           objectiveExpression = objectiveExpression.plus(c.minus(child.outerBox.top, box.bottom));
 
           const deepestRoot = this.blocksById[child.deepestRootId];
@@ -76,7 +78,7 @@ export class SymbolDiagramLayout {
           // Climb up the parent's owner hierarchy.
           var ownerChain = this.blocksById[node.ownerId];
           while (ownerChain && child.ownerId !== ownerChain.id) {
-            ineq(c.plus(ownerChain.outerBox.bottom, options.verticalSpacing * 2), c.LEQ, child.outerBox.top);
+            ineq(c.plus(ownerChain.outerBox.bottom, this.options.verticalSpacing * 2), c.LEQ, child.outerBox.top);
             ownerChain = this.blocksById[ownerChain.ownerId];
           }
 
@@ -92,8 +94,8 @@ export class SymbolDiagramLayout {
         outerBox.constrain(solver);
         innerBox.constrain(solver);
 
-        ineq(innerBox.width, c.GEQ, options.nodeWidth);
-        ineq(innerBox.height, c.GEQ, options.nodeHeight);
+        ineq(innerBox.width, c.GEQ, this.options.nodeWidth);
+        ineq(innerBox.height, c.GEQ, this.options.nodeHeight);
 
         objectiveExpression = objectiveExpression.plus(innerBox.width);
         objectiveExpression = objectiveExpression.plus(innerBox.height);
@@ -104,23 +106,24 @@ export class SymbolDiagramLayout {
         eq(innerBox.left, outerBox.left);
         eq(innerBox.top, outerBox.top);
         eq(innerBox.bottom, outerBox.bottom);
-        const cloningLabelWidth = 10 + cloning.id.length * 4;
+        // TODO: hacky text width calculation follows:
+        const cloningLabelWidth = 10 + this.options.cloningLabelExtractor(cloning).length * 4;
         eq(c.plus(innerBox.right, cloningLabelWidth), outerBox.right);
 
         const root = this.blocksById[cloning.rootId];
         if (root) {
           eq(root.outerBox.top, innerBox.top);
-          ineq(root.outerBox.left, c.GEQ, c.plus(innerBox.left, options.paddingBetweenClonings));
-          ineq(root.outerBox.right, c.LEQ, c.plus(innerBox.right, -options.paddingBetweenClonings));
-          ineq(root.outerBox.bottom, c.LEQ, c.plus(innerBox.bottom, -options.paddingBetweenClonings));
+          ineq(root.outerBox.left, c.GEQ, c.plus(innerBox.left, this.options.paddingBetweenClonings));
+          ineq(root.outerBox.right, c.LEQ, c.plus(innerBox.right, -this.options.paddingBetweenClonings));
+          ineq(root.outerBox.bottom, c.LEQ, c.plus(innerBox.bottom, -this.options.paddingBetweenClonings));
         }
 
         const ownerCloning = this.blocksById[cloning.ownerId];
         if (ownerCloning) {
           ineq(cloning.outerBox.top, c.GEQ, ownerCloning.innerBox.top);
-          ineq(cloning.outerBox.left, c.GEQ, c.plus(ownerCloning.innerBox.left, options.paddingBetweenClonings));
-          ineq(cloning.outerBox.right, c.LEQ, c.plus(ownerCloning.innerBox.right, -options.paddingBetweenClonings));
-          ineq(cloning.outerBox.bottom, c.LEQ, c.plus(ownerCloning.innerBox.bottom, -options.paddingBetweenClonings));
+          ineq(cloning.outerBox.left, c.GEQ, c.plus(ownerCloning.innerBox.left, this.options.paddingBetweenClonings));
+          ineq(cloning.outerBox.right, c.LEQ, c.plus(ownerCloning.innerBox.right, -this.options.paddingBetweenClonings));
+          ineq(cloning.outerBox.bottom, c.LEQ, c.plus(ownerCloning.innerBox.bottom, -this.options.paddingBetweenClonings));
         }
       }
     }));

@@ -46,8 +46,15 @@ const SimpleSymbolDiagram = React.createClass({
         )}
         {layout.blocks.map(byType({
           node: (node) =>
-            <g transform={"translate(" + node.outerBox.left.value + "," + node.outerBox.top.value + ")"}>
-              <rect width={node.outerBox.width.value} height={node.outerBox.height.value} fill="#F2F2F2" stroke="black"/>
+            <g>
+              <rect
+                x={node.outerBox.left.value} y={node.outerBox.top.value}
+                width={node.outerBox.width.value} height={node.outerBox.height.value} fill="#F2F2F2" stroke="black"/>
+              <text
+                  x={node.outerBox.centerX.value} y={node.outerBox.top.value + 5}
+                  style={{dominantBaseline: 'hanging', textAnchor: 'middle', fontSize: 8}}>
+                {node.localId}
+              </text>
             </g>,
           cloning: (cloning) =>
             <g>
@@ -56,9 +63,9 @@ const SimpleSymbolDiagram = React.createClass({
                 width={cloning.innerBox.width.value} height={cloning.innerBox.height.value}
                 fill="none" stroke="gray" strokeDasharray="4" strokeWidth="1"/>
               <text
-                  x={cloning.innerBox.right.value + 10} y={cloning.innerBox.top.value + 5}
+                  x={cloning.innerBox.right.value + 5} y={cloning.innerBox.top.value + 5}
                   style={{dominantBaseline: 'hanging', fontSize: 8}}>
-                {cloning.id}
+                {cloning.localId}
               </text>
             </g>
         }))}
