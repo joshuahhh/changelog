@@ -1,4 +1,4 @@
-module Symbol ( SymbolId, NodeId, SymbolRef(..), Cloning, Change(..), myEnvironment, CompoundSymbol ) where
+module Symbol ( SymbolId, NodeId, SymbolRef(..), Cloning, Change(..), myEnvironment, CompoundSymbol, Environment ) where
 
 import Array exposing ( Array )
 import Dict exposing ( Dict )

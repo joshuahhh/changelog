@@ -10854,15 +10854,10 @@ Elm.Util.make = function (_elm) {
    $Result = Elm.Result.make(_elm),
    $Signal = Elm.Signal.make(_elm);
    var _op = {};
-   var force = function (maybeA) {
-      var _p0 = maybeA;
-      if (_p0.ctor === "Just") {
-            return _p0._0;
-         } else {
-            return _U.crashCase("Util",
-            {start: {line: 24,column: 3},end: {line: 26,column: 47}},
-            _p0)("forced a Nothing!");
-         }
+   var unwrapOrCrash = function (message) {
+      return $Maybe.withDefault(_U.crash("Util",
+      {start: {line: 28,column: 44}
+      ,end: {line: 28,column: 55}})(message));
    };
    var idIs = F2(function (id,thingWithId) {
       return _U.eq(thingWithId.id,id);
@@ -10876,25 +10871,14 @@ Elm.Util.make = function (_elm) {
    });
    var find = F2(function (predicate,list) {
       var filteredList = A2($List.filter,predicate,list);
-      if (!_U.eq($List.length(filteredList),1))
-      return _U.crash("Util",
-         {start: {line: 9,column: 7}
-         ,end: {line: 9,column: 18}})("find failed!"); else {
-            var _p2 = $List.head(filteredList);
-            if (_p2.ctor === "Just") {
-                  return _p2._0;
-               } else {
-                  return _U.crashCase("Util",
-                  {start: {line: 11,column: 7},end: {line: 13,column: 46}},
-                  _p2)("find failed!");
-               }
-         }
+      return !_U.eq($List.length(filteredList),
+      1) ? $Maybe.Nothing : $List.head(filteredList);
    });
    return _elm.Util.values = {_op: _op
                              ,find: find
                              ,mapWhen: mapWhen
                              ,idIs: idIs
-                             ,force: force};
+                             ,unwrapOrCrash: unwrapOrCrash};
 };
 Elm.Symbol = Elm.Symbol || {};
 Elm.Symbol.make = function (_elm) {
@@ -10942,6 +10926,7 @@ Elm.Symbol.make = function (_elm) {
                                ,myEnvironment: myEnvironment
                                ,Cloning: Cloning
                                ,CompoundSymbol: CompoundSymbol
+                               ,Environment: Environment
                                ,BareNode: BareNode
                                ,SymbolIdAsRef: SymbolIdAsRef
                                ,SetRoot: SetRoot
@@ -10954,13 +10939,16 @@ Elm.SymbolRendering.make = function (_elm) {
    if (_elm.SymbolRendering.values)
    return _elm.SymbolRendering.values;
    var _U = Elm.Native.Utils.make(_elm),
+   $Array = Elm.Array.make(_elm),
    $Basics = Elm.Basics.make(_elm),
    $Debug = Elm.Debug.make(_elm),
+   $Dict = Elm.Dict.make(_elm),
    $Json$Encode = Elm.Json.Encode.make(_elm),
    $List = Elm.List.make(_elm),
    $Maybe = Elm.Maybe.make(_elm),
    $Result = Elm.Result.make(_elm),
    $Signal = Elm.Signal.make(_elm),
+   $String = Elm.String.make(_elm),
    $Symbol = Elm.Symbol.make(_elm),
    $Util = Elm.Util.make(_elm);
    var _op = {};
@@ -10971,16 +10959,22 @@ Elm.SymbolRendering.make = function (_elm) {
    };
    var blockToThatJsonFormatIUse = function (_p0) {
       var _p1 = _p0;
-      var _p4 = _p1.ownerId;
-      var _p3 = _p1.id;
-      return $Json$Encode.object(function () {
+      return $Json$Encode.object(A2($Basics._op["++"],
+      _U.list([{ctor: "_Tuple2"
+               ,_0: "id"
+               ,_1: $Json$Encode.string(_p1.id)}
+              ,{ctor: "_Tuple2"
+               ,_0: "localId"
+               ,_1: $Json$Encode.string(_p1.localId)}
+              ,{ctor: "_Tuple2"
+               ,_0: "ownerId"
+               ,_1: jsonEncodeMaybeString(_p1.ownerId)}]),
+      function () {
          var _p2 = _p1.body;
          if (_p2.ctor === "NodeBodyAsBlockBody") {
                return _U.list([{ctor: "_Tuple2"
                                ,_0: "type"
                                ,_1: $Json$Encode.string("node")}
-                              ,{ctor: "_Tuple2",_0: "id",_1: $Json$Encode.string(_p3)}
-                              ,{ctor: "_Tuple2",_0: "ownerId",_1: jsonEncodeMaybeString(_p4)}
                               ,{ctor: "_Tuple2"
                                ,_0: "childIds"
                                ,_1: $Json$Encode.list(A2($List.map,
@@ -10990,13 +10984,11 @@ Elm.SymbolRendering.make = function (_elm) {
                return _U.list([{ctor: "_Tuple2"
                                ,_0: "type"
                                ,_1: $Json$Encode.string("cloning")}
-                              ,{ctor: "_Tuple2",_0: "id",_1: $Json$Encode.string(_p3)}
-                              ,{ctor: "_Tuple2",_0: "ownerId",_1: jsonEncodeMaybeString(_p4)}
                               ,{ctor: "_Tuple2"
                                ,_0: "rootId"
                                ,_1: jsonEncodeMaybeString(_p2._0.rootId)}]);
             }
-      }());
+      }()));
    };
    var symbolRenderingToThatJsonFormatIUse = function (symbolRendering) {
       var blockValues = A2($List.map,
@@ -11014,12 +11006,14 @@ Elm.SymbolRendering.make = function (_elm) {
    };
    var extractNodesFromRoot = F2(function (blocks,rootId) {
       extractNodesFromRoot: while (true) {
-         var rootBlock = A2($Util.find,$Util.idIs(rootId),blocks);
-         var _p5 = rootBlock.body;
-         if (_p5.ctor === "CloningBodyAsBlockBody") {
-               var _p6 = _p5._0.rootId;
-               if (_p6.ctor === "Just") {
-                     var _v4 = blocks,_v5 = _p6._0;
+         var rootBlock = A2($Util.unwrapOrCrash,
+         "Could not find root block",
+         A2($Util.find,$Util.idIs(rootId),blocks));
+         var _p3 = rootBlock.body;
+         if (_p3.ctor === "CloningBodyAsBlockBody") {
+               var _p4 = _p3._0.rootId;
+               if (_p4.ctor === "Just") {
+                     var _v4 = blocks,_v5 = _p4._0;
                      blocks = _v4;
                      rootId = _v5;
                      continue extractNodesFromRoot;
@@ -11030,15 +11024,15 @@ Elm.SymbolRendering.make = function (_elm) {
                return $Maybe.Just(ExtractedNode({id: rootBlock.id
                                                 ,children: A2($List.filterMap,
                                                 extractNodesFromRoot(blocks),
-                                                _p5._0.childIds)}));
+                                                _p3._0.childIds)}));
             }
       }
    });
-   var extractNodes = function (_p7) {
-      var _p8 = _p7;
-      var _p9 = _p8.rootId;
-      if (_p9.ctor === "Just") {
-            return A2(extractNodesFromRoot,_p8.blocks,_p9._0);
+   var extractNodes = function (_p5) {
+      var _p6 = _p5;
+      var _p7 = _p6.rootId;
+      if (_p7.ctor === "Just") {
+            return A2(extractNodesFromRoot,_p6.blocks,_p7._0);
          } else {
             return $Maybe.Nothing;
          }
@@ -11047,10 +11041,10 @@ Elm.SymbolRendering.make = function (_elm) {
       return {change: a,contextId: b};
    });
    var constructBlockId = F2(function (maybeBlockId,nodeId) {
-      var _p10 = maybeBlockId;
-      if (_p10.ctor === "Just") {
+      var _p8 = maybeBlockId;
+      if (_p8.ctor === "Just") {
             return A2($Basics._op["++"],
-            _p10._0,
+            _p8._0,
             A2($Basics._op["++"],"/",nodeId));
          } else {
             return nodeId;
@@ -11066,18 +11060,41 @@ Elm.SymbolRendering.make = function (_elm) {
    var setRootOfBlockWhichMustBeCloning = F2(function (rootId,
    block) {
       var oldCloningBody = function () {
-         var _p11 = block.body;
-         if (_p11.ctor === "CloningBodyAsBlockBody") {
-               return _p11._0;
+         var _p9 = block.body;
+         if (_p9.ctor === "CloningBodyAsBlockBody") {
+               return _p9._0;
             } else {
                return _U.crashCase("SymbolRendering",
-               {start: {line: 62,column: 22},end: {line: 64,column: 65}},
-               _p11)("you can only set the root of a cloning!");
+               {start: {line: 66,column: 22},end: {line: 68,column: 65}},
+               _p9)("you can only set the root of a cloning!");
             }
       }();
       var newBody = CloningBodyAsBlockBody(_U.update(oldCloningBody,
       {rootId: $Maybe.Just(rootId)}));
       return _U.update(block,{body: newBody});
+   });
+   var incrementNextChangeOfBlockWhichMustBeCloning = function (block) {
+      var oldCloningBody = function () {
+         var _p11 = block.body;
+         if (_p11.ctor === "CloningBodyAsBlockBody") {
+               return _p11._0;
+            } else {
+               return _U.crashCase("SymbolRendering",
+               {start: {line: 115,column: 22},end: {line: 117,column: 75}},
+               _p11)("you can only increment `nextChange` of a cloning!");
+            }
+      }();
+      var newBody = CloningBodyAsBlockBody(_U.update(oldCloningBody,
+      {nextChange: oldCloningBody.nextChange + 1}));
+      return _U.update(block,{body: newBody});
+   };
+   var incrementNextChangeOfCloningInSymbolRendering = F2(function (blockId,
+   symbolRendering) {
+      return _U.update(symbolRendering,
+      {blocks: A3($Util.mapWhen,
+      $Util.idIs(blockId),
+      incrementNextChangeOfBlockWhichMustBeCloning,
+      symbolRendering.blocks)});
    });
    var NodeBodyAsBlockBody = function (a) {
       return {ctor: "NodeBodyAsBlockBody",_0: a};
@@ -11090,16 +11107,18 @@ Elm.SymbolRendering.make = function (_elm) {
                return _p13._0;
             } else {
                return _U.crashCase("SymbolRendering",
-               {start: {line: 52,column: 19},end: {line: 54,column: 61}},
+               {start: {line: 56,column: 19},end: {line: 58,column: 61}},
                _p13)("you can only add a child to a node!");
             }
       }();
       var newBody = NodeBodyAsBlockBody(_U.update(oldNodeBody,
-      {childIds: A2($List._op["::"],childId,oldNodeBody.childIds)}));
+      {childIds: A2($List.append,
+      oldNodeBody.childIds,
+      _U.list([childId]))}));
       return _U.update(block,{body: newBody});
    });
-   var Block = F3(function (a,b,c) {
-      return {id: a,ownerId: b,body: c};
+   var Block = F4(function (a,b,c,d) {
+      return {id: a,localId: b,ownerId: c,body: d};
    });
    var cloningToBlock = F2(function (cloning,maybeOwnerId) {
       var newBody = function () {
@@ -11113,7 +11132,7 @@ Elm.SymbolRendering.make = function (_elm) {
             }
       }();
       var newId = A2(constructBlockId,maybeOwnerId,cloning.id);
-      return A3(Block,newId,maybeOwnerId,newBody);
+      return A4(Block,newId,cloning.id,maybeOwnerId,newBody);
    });
    var runChangeInContext = F2(function (_p16,symbolRendering) {
       var _p17 = _p16;
@@ -11161,6 +11180,55 @@ Elm.SymbolRendering.make = function (_elm) {
             return _U.update(symbolRendering,{blocks: newBlocks});
          }
    });
+   var catchUpCloningInSymbolRendering = F3(function (environment,
+   blockId,
+   symbolRendering) {
+      catchUpCloningInSymbolRendering: while (true) {
+         var block = A2($Util.unwrapOrCrash,
+         A2($String.join,
+         "\n",
+         _U.list(["Could not find block"
+                 ,blockId
+                 ,$Basics.toString(A2($List.map,
+                 function (_) {
+                    return _.id;
+                 },
+                 symbolRendering.blocks))])),
+         A2($Util.find,$Util.idIs(blockId),symbolRendering.blocks));
+         var cloningBody = function () {
+            var _p24 = block.body;
+            if (_p24.ctor === "CloningBodyAsBlockBody") {
+                  return _p24._0;
+               } else {
+                  return _U.crashCase("SymbolRendering",
+                  {start: {line: 138,column: 7},end: {line: 140,column: 59}},
+                  _p24)("you can only catch up clonings!");
+               }
+         }();
+         var nextChange = cloningBody.nextChange;
+         var symbol = A2($Util.unwrapOrCrash,
+         "Could not find symbol!",
+         A2($Dict.get,cloningBody.symbolId,environment.symbols));
+         var changes = symbol.changes;
+         if (_U.eq(nextChange,$Array.length(changes)))
+         return symbolRendering; else {
+               var _v18 = environment,
+               _v19 = blockId,
+               _v20 = A2(incrementNextChangeOfCloningInSymbolRendering,
+               blockId,
+               A2(runChangeInContext,
+               {change: A2($Util.unwrapOrCrash,
+               "Could not find nextChange",
+               A2($Array.get,nextChange,changes))
+               ,contextId: $Maybe.Just(blockId)},
+               symbolRendering));
+               environment = _v18;
+               blockId = _v19;
+               symbolRendering = _v20;
+               continue catchUpCloningInSymbolRendering;
+            }
+      }
+   });
    var SymbolRendering = F2(function (a,b) {
       return {blocks: a,rootId: b};
    });
@@ -11177,6 +11245,9 @@ Elm.SymbolRendering.make = function (_elm) {
                                         ,setRootOfBlockWhichMustBeCloning: setRootOfBlockWhichMustBeCloning
                                         ,ChangeInContext: ChangeInContext
                                         ,runChangeInContext: runChangeInContext
+                                        ,incrementNextChangeOfBlockWhichMustBeCloning: incrementNextChangeOfBlockWhichMustBeCloning
+                                        ,incrementNextChangeOfCloningInSymbolRendering: incrementNextChangeOfCloningInSymbolRendering
+                                        ,catchUpCloningInSymbolRendering: catchUpCloningInSymbolRendering
                                         ,ExtractedNode: ExtractedNode
                                         ,extractNodes: extractNodes
                                         ,extractNodesFromRoot: extractNodesFromRoot
@@ -11204,43 +11275,87 @@ Elm.Main.make = function (_elm) {
    $SymbolRendering = Elm.SymbolRendering.make(_elm),
    $Util = Elm.Util.make(_elm);
    var _op = {};
-   var initialSymbolRendering = {blocks: _U.list([])
-                                ,rootId: $Maybe.Nothing};
-   var transform = $Util.force(A2($Dict.get,
-   "Transform",
-   $Symbol.myEnvironment.symbols));
-   var group = $Util.force(A2($Dict.get,
-   "Group",
-   $Symbol.myEnvironment.symbols));
-   var changesInContext = _U.list([{contextId: $Maybe.Nothing
-                                   ,change: $Symbol.SetRoot({id: "1"
-                                                            ,symbolRef: $Symbol.SymbolIdAsRef("Group")})}
-                                  ,{contextId: $Maybe.Just("1")
-                                   ,change: $Util.force(A2($Array.get,0,group.changes))}
-                                  ,{contextId: $Maybe.Just("1")
-                                   ,change: $Util.force(A2($Array.get,1,group.changes))}
-                                  ,{contextId: $Maybe.Just("1/transform")
-                                   ,change: $Util.force(A2($Array.get,0,transform.changes))}]);
-   var symbolRenderings = A3($List.scanl,
-   $SymbolRendering.runChangeInContext,
-   initialSymbolRendering,
-   changesInContext);
-   var symbolRenderingsInJson = $Json$Encode.list(A2($List.map,
+   var symbolRenderings2 = function () {
+      var sr1 = {blocks: _U.list([]),rootId: $Maybe.Nothing};
+      var sr2 = A2($SymbolRendering.runChangeInContext,
+      {contextId: $Maybe.Nothing
+      ,change: $Symbol.SetRoot({id: "1"
+                               ,symbolRef: $Symbol.SymbolIdAsRef("Group")})},
+      sr1);
+      var sr3 = A3($SymbolRendering.catchUpCloningInSymbolRendering,
+      $Symbol.myEnvironment,
+      "1",
+      sr2);
+      return _U.list([sr1,sr2,sr3]);
+   }();
+   var symbolRenderingsInJson2 = $Json$Encode.list(A2($List.map,
    $SymbolRendering.symbolRenderingToThatJsonFormatIUse,
-   symbolRenderings));
+   symbolRenderings2));
    var main = A2($Html.div,
    _U.list([]),
    _U.list([A2($Html.pre,
    _U.list([]),
    _U.list([$Html.text(A2($Json$Encode.encode,
    4,
-   symbolRenderingsInJson))]))]));
+   symbolRenderingsInJson2))]))]));
+   var initialSymbolRendering = {blocks: _U.list([])
+                                ,rootId: $Maybe.Nothing};
+   var transform = A2($Util.unwrapOrCrash,
+   "???",
+   A2($Dict.get,"Transform",$Symbol.myEnvironment.symbols));
+   var group = A2($Util.unwrapOrCrash,
+   "???",
+   A2($Dict.get,"Group",$Symbol.myEnvironment.symbols));
+   var changesInContext = _U.list([{contextId: $Maybe.Nothing
+                                   ,change: $Symbol.SetRoot({id: "1"
+                                                            ,symbolRef: $Symbol.SymbolIdAsRef("Group")})}
+                                  ,{contextId: $Maybe.Just("1")
+                                   ,change: A2($Util.unwrapOrCrash,
+                                   "???",
+                                   A2($Array.get,0,group.changes))}
+                                  ,{contextId: $Maybe.Just("1")
+                                   ,change: A2($Util.unwrapOrCrash,
+                                   "???",
+                                   A2($Array.get,1,group.changes))}
+                                  ,{contextId: $Maybe.Just("1/transform")
+                                   ,change: A2($Util.unwrapOrCrash,
+                                   "???",
+                                   A2($Array.get,0,transform.changes))}
+                                  ,{contextId: $Maybe.Nothing
+                                   ,change: A2($Symbol.AppendChild,
+                                   "1/node",
+                                   {id: "2",symbolRef: $Symbol.SymbolIdAsRef("Group")})}
+                                  ,{contextId: $Maybe.Just("2")
+                                   ,change: A2($Util.unwrapOrCrash,
+                                   "???",
+                                   A2($Array.get,0,group.changes))}
+                                  ,{contextId: $Maybe.Just("2")
+                                   ,change: A2($Util.unwrapOrCrash,
+                                   "???",
+                                   A2($Array.get,1,group.changes))}
+                                  ,{contextId: $Maybe.Just("2/transform")
+                                   ,change: A2($Util.unwrapOrCrash,
+                                   "???",
+                                   A2($Array.get,0,transform.changes))}
+                                  ,{contextId: $Maybe.Nothing
+                                   ,change: A2($Symbol.AppendChild,
+                                   "1/transform/node",
+                                   {id: "3",symbolRef: $Symbol.SymbolIdAsRef("Group")})}]);
+   var symbolRenderings1 = A3($List.scanl,
+   $SymbolRendering.runChangeInContext,
+   initialSymbolRendering,
+   changesInContext);
+   var symbolRenderingsInJson1 = $Json$Encode.list(A2($List.map,
+   $SymbolRendering.symbolRenderingToThatJsonFormatIUse,
+   symbolRenderings1));
    return _elm.Main.values = {_op: _op
                              ,group: group
                              ,transform: transform
                              ,initialSymbolRendering: initialSymbolRendering
                              ,changesInContext: changesInContext
-                             ,symbolRenderings: symbolRenderings
-                             ,symbolRenderingsInJson: symbolRenderingsInJson
+                             ,symbolRenderings1: symbolRenderings1
+                             ,symbolRenderingsInJson1: symbolRenderingsInJson1
+                             ,symbolRenderings2: symbolRenderings2
+                             ,symbolRenderingsInJson2: symbolRenderingsInJson2
                              ,main: main};
 };

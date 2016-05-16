@@ -1,9 +1,12 @@
 module SymbolRendering where
 
 import Json.Encode
+import String
+import Dict exposing ( Dict )
+import Array exposing ( Array )
 
-import Util exposing ( mapWhen, idIs, find )
-import Symbol exposing ( SymbolId, NodeId, SymbolRef(..), Cloning, Change(..) )
+import Util exposing ( mapWhen, idIs, find, unwrapOrCrash )
+import Symbol exposing ( SymbolId, NodeId, SymbolRef(..), Cloning, Change(..), Environment )
 
 -- And here's the dynamic world of (partially) rendered logs
 
@@ -106,6 +109,52 @@ runChangeInContext {change, contextId} symbolRendering =
       in
         { symbolRendering | blocks = newBlocks }
 
+incrementNextChangeOfBlockWhichMustBeCloning : Block -> Block
+incrementNextChangeOfBlockWhichMustBeCloning block =
+  let
+    oldCloningBody = case block.body of
+      CloningBodyAsBlockBody oldCloningBody -> oldCloningBody
+      _ -> Debug.crash "you can only increment `nextChange` of a cloning!"
+    newBody = CloningBodyAsBlockBody { oldCloningBody | nextChange = oldCloningBody.nextChange + 1 }
+  in
+    { block | body = newBody }
+
+incrementNextChangeOfCloningInSymbolRendering : BlockId -> SymbolRendering -> SymbolRendering
+incrementNextChangeOfCloningInSymbolRendering blockId symbolRendering =
+  { symbolRendering | blocks =
+      symbolRendering.blocks |>
+        mapWhen (idIs blockId) incrementNextChangeOfBlockWhichMustBeCloning
+  }
+
+catchUpCloningInSymbolRendering : Environment -> BlockId -> SymbolRendering -> SymbolRendering
+catchUpCloningInSymbolRendering environment blockId symbolRendering =
+  let
+    block = find (idIs blockId) symbolRendering.blocks |> unwrapOrCrash (String.join "\n"
+      [ "Could not find block"
+      , blockId
+      , toString (List.map .id symbolRendering.blocks)
+      ])
+    cloningBody =
+      case block.body of
+        CloningBodyAsBlockBody cloningBody -> cloningBody
+        _ -> Debug.crash "you can only catch up clonings!"
+    nextChange = cloningBody.nextChange
+    symbol = environment.symbols |> Dict.get cloningBody.symbolId |> unwrapOrCrash "Could not find symbol!"
+    changes = symbol.changes
+  in
+    if nextChange == Array.length changes then
+      -- we're caught up already!
+      symbolRendering
+    else
+      -- catch up one change, then recurse
+      symbolRendering
+        |> runChangeInContext
+          { change = changes |> Array.get nextChange |> unwrapOrCrash "Could not find nextChange"
+          , contextId = Just blockId
+          }
+        |> incrementNextChangeOfCloningInSymbolRendering blockId
+        |> catchUpCloningInSymbolRendering environment blockId
+
 type ExtractedNode =
   ExtractedNode { id : BlockId, children : List ExtractedNode }
 
@@ -118,7 +167,7 @@ extractNodes { blocks, rootId } =
 extractNodesFromRoot : List Block -> BlockId -> Maybe ExtractedNode
 extractNodesFromRoot blocks rootId =
   let
-    rootBlock = find (idIs rootId) blocks
+    rootBlock = find (idIs rootId) blocks |> unwrapOrCrash "Could not find root block"
   in
     case rootBlock.body of
       CloningBodyAsBlockBody cloningBody ->
@@ -129,6 +178,7 @@ extractNodesFromRoot blocks rootId =
         Just (ExtractedNode
           { id = rootBlock.id
           , children = List.filterMap (extractNodesFromRoot blocks) blockBody.childIds })
+
 
 jsonEncodeMaybeString : Maybe String -> Json.Encode.Value
 jsonEncodeMaybeString maybeString =
