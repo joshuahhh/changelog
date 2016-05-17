@@ -13,7 +13,7 @@ const WigglyLine = ({x1, y1, x2, y2, ...otherProps}) =>
 
 const SimpleSymbolDiagram = React.createClass({
   render() {
-    const {symbolDiagram} = this.props;
+    const {symbolDiagram, environment} = this.props;
     const style = {verticalAlign: 'top'};
 
     if (!symbolDiagram.rootId) {
@@ -25,15 +25,15 @@ const SimpleSymbolDiagram = React.createClass({
     layout.resolve();
     console.log('laid out in', +(new Date()) - then);
 
-    const svgWidth = _.max(layout.blocks.map((block) => block.outerBox.right.value)) + 10;
-    const svgHeight = _.max(layout.blocks.map((block) => block.outerBox.bottom.value)) + 10;
+    const svgWidth = _.max(layout.blocks.map((block) => block.outerBox.right.value)) + 2;
+    const svgHeight = _.max(layout.blocks.map((block) => block.outerBox.bottom.value)) + 2;
 
     return (
       <svg width={svgWidth} height={svgHeight} style={style}>
         {layout.blocks.map((block) => block.type == 'node' &&
           block.childIds.map((childId) => {
             const child = layout.blocksById[childId];
-            const deepestRoot = layout.blocksById[child.deepestRootId];
+            const deepestRoot = layout.blocksById[child.deepestRootId]; // || child;
             // TODO: get rid of this if a node gets an innerBox
             const deepestRootBox = deepestRoot.innerBox || deepestRoot.outerBox;
             return (
@@ -51,7 +51,7 @@ const SimpleSymbolDiagram = React.createClass({
                 x={node.outerBox.left.value} y={node.outerBox.top.value}
                 width={node.outerBox.width.value} height={node.outerBox.height.value} fill="#F2F2F2" stroke="black"/>
               <text
-                  x={node.outerBox.centerX.value} y={node.outerBox.top.value + 5}
+                  x={node.outerBox.centerX.value} y={node.outerBox.top.value + 2}
                   style={{dominantBaseline: 'hanging', textAnchor: 'middle', fontSize: 8}}>
                 {node.localId}
               </text>
@@ -62,11 +62,22 @@ const SimpleSymbolDiagram = React.createClass({
                 x={cloning.innerBox.left.value} y={cloning.innerBox.top.value}
                 width={cloning.innerBox.width.value} height={cloning.innerBox.height.value}
                 fill="none" stroke="gray" strokeDasharray="4" strokeWidth="1"/>
-              <text
-                  x={cloning.innerBox.right.value + 5} y={cloning.innerBox.top.value + 5}
-                  style={{dominantBaseline: 'hanging', fontSize: 8}}>
-                {cloning.localId}
-              </text>
+              <g transform={`translate(${cloning.innerBox.right.value + 5}, ${cloning.innerBox.top.value + 2})`}>
+                <text
+                    style={{dominantBaseline: 'hanging', fontSize: 8}}>
+                  {cloning.localId}
+                </text>
+                <text
+                    y={10}
+                    style={{dominantBaseline: 'hanging', fontSize: 8}}>
+                  {cloning.symbolId}
+                </text>
+                <text
+                    y={20}
+                    style={{dominantBaseline: 'hanging', fontSize: 8}}>
+                  {cloning.nextChange + ' / ' + environment.symbols[cloning.symbolId].changes.length}
+                </text>
+              </g>
             </g>
         }))}
       </svg>

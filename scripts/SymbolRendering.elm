@@ -6,6 +6,7 @@ import Dict exposing ( Dict )
 import Array exposing ( Array )
 
 import Util exposing ( mapWhen, idIs, find, unwrapOrCrash )
+import JsonEncodeTools exposing ( jsonEncodeMaybeString )
 import Symbol exposing ( SymbolId, NodeId, SymbolRef(..), Cloning, Change(..), Environment )
 
 -- And here's the dynamic world of (partially) rendered logs
@@ -131,7 +132,7 @@ catchUpCloningInSymbolRendering environment blockId symbolRendering =
   let
     block = find (idIs blockId) symbolRendering.blocks |> unwrapOrCrash (String.join "\n"
       [ "Could not find block"
-      , blockId
+      , toString blockId
       , toString (List.map .id symbolRendering.blocks)
       ])
     cloningBody =
@@ -179,34 +180,30 @@ extractNodesFromRoot blocks rootId =
           { id = rootBlock.id
           , children = List.filterMap (extractNodesFromRoot blocks) blockBody.childIds })
 
-
-jsonEncodeMaybeString : Maybe String -> Json.Encode.Value
-jsonEncodeMaybeString maybeString =
-  Maybe.map Json.Encode.string maybeString |> Maybe.withDefault Json.Encode.null
-
-
-blockToThatJsonFormatIUse : Block -> Json.Encode.Value
-blockToThatJsonFormatIUse {id, localId, ownerId, body} =
+jsonEncodeBlock : Block -> Json.Encode.Value
+jsonEncodeBlock {id, localId, ownerId, body} =
   Json.Encode.object (
     [ ( "id", Json.Encode.string id )
     , ( "localId", Json.Encode.string localId )
     , ( "ownerId", jsonEncodeMaybeString ownerId )
     ] ++
     case body of
-      NodeBodyAsBlockBody {childIds} ->
+      NodeBodyAsBlockBody { childIds } ->
         [ ( "type", Json.Encode.string "node" )
         , ( "childIds", Json.Encode.list (List.map Json.Encode.string childIds) )
         ]
-      CloningBodyAsBlockBody {rootId} ->
+      CloningBodyAsBlockBody { rootId, symbolId, nextChange } ->
         [ ( "type", Json.Encode.string "cloning" )
         , ( "rootId", jsonEncodeMaybeString rootId )
+        , ( "symbolId", Json.Encode.string symbolId )
+        , ( "nextChange", Json.Encode.int nextChange )
         ])
 
 
-symbolRenderingToThatJsonFormatIUse : SymbolRendering -> Json.Encode.Value
-symbolRenderingToThatJsonFormatIUse symbolRendering =
+jsonEncodeSymbolRendering : SymbolRendering -> Json.Encode.Value
+jsonEncodeSymbolRendering symbolRendering =
   let
-    blockValues = List.map blockToThatJsonFormatIUse symbolRendering.blocks
+    blockValues = List.map jsonEncodeBlock symbolRendering.blocks
   in
     Json.Encode.object
     [ ( "blocks", Json.Encode.list blockValues )

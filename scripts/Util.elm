@@ -18,11 +18,9 @@ mapWhen predicate mapper list =
 idIs : a -> { record | id : a } -> Bool
 idIs id thingWithId = thingWithId.id == id
 
--- force : Maybe a -> a
--- force maybeA =
---   case maybeA of
---     Just a  -> a
---     Nothing -> Debug.crash "forced a Nothing!"
-
+-- can't use Maybe.withDefault cuz Elm isn't lazy! cool!
 unwrapOrCrash : String -> Maybe a -> a
-unwrapOrCrash message = Maybe.withDefault (Debug.crash message)
+unwrapOrCrash message maybeA =
+  case maybeA of
+    Just a  -> a
+    Nothing -> Debug.crash message
