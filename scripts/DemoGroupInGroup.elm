@@ -5,12 +5,11 @@ import Dict
 import Array
 
 import SymbolRendering exposing (
-  SymbolRendering, ChangeInContext,
-  runChangeInContext, catchUpCloningInSymbolRendering,
-  jsonEncodeSymbolRendering)
+  SymbolRendering, runChangeInContextAsStep, catchUpCloning, jsonEncodeSymbolRendering)
 import Symbol exposing (
-  Environment, Change(..), SymbolRef(..),
-  environmentToJson )
+  Environment, Change(..), SymbolRef(..), environmentToJson )
+import Story exposing (
+  Story, emptyStory, jsonEncodeStory )
 
 myEnvironment : Environment
 myEnvironment =
@@ -42,10 +41,10 @@ myEnvironment =
     )
   ]}
 
-symbolRenderings : List SymbolRendering
-symbolRenderings = List.scanl (<|)
-  { blocks = [], rootId = Nothing }
-  [ runChangeInContext
+story : Story SymbolRendering
+story =
+  emptyStory { blocks = [], rootId = Nothing }
+  |> runChangeInContextAsStep
       { contextId = Nothing
       , change =
           SetRoot
@@ -53,9 +52,9 @@ symbolRenderings = List.scanl (<|)
             , symbolRef = SymbolIdAsRef "Group"
             }
       }
-  , catchUpCloningInSymbolRendering myEnvironment "group1"
-  , catchUpCloningInSymbolRendering myEnvironment "group1/transform"
-  , runChangeInContext
+  |> catchUpCloning myEnvironment "group1"
+  |> catchUpCloning myEnvironment "group1/transform"
+  |> runChangeInContextAsStep
       { contextId = Nothing
       , change =
           AppendChild
@@ -64,26 +63,10 @@ symbolRenderings = List.scanl (<|)
             , symbolRef = SymbolIdAsRef "Group"
             }
       }
-  , catchUpCloningInSymbolRendering myEnvironment "group2"
-  ]
+  |> catchUpCloning myEnvironment "group2"
 
-descriptionsInJson : Json.Encode.Value
-descriptionsInJson =
-  [ "Start with an empty diagram."
-  , "Clone a Group as the root."
-  , "Tell the Group to catch up."
-  , "Tell the Transform inside the Group to catch up."
-  , "Clone a Group as a new child of the root node."
-  , "Tell the second Group to catch up."
-  ]
-  |> List.map Json.Encode.string
-  |> Json.Encode.list
-
-symbolRenderingsInJson : Json.Encode.Value
-symbolRenderingsInJson =
-  symbolRenderings
-  |> List.map jsonEncodeSymbolRendering
-  |> Json.Encode.list
+storyInJson : Json.Encode.Value
+storyInJson = story |> jsonEncodeStory jsonEncodeSymbolRendering
 
 environmentInJson : Json.Encode.Value
 environmentInJson = environmentToJson myEnvironment

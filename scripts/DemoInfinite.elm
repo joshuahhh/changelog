@@ -5,12 +5,11 @@ import Dict
 import Array
 
 import SymbolRendering exposing (
-  SymbolRendering, ChangeInContext,
-  runChangeInContext, catchUpCloningInSymbolRendering,
-  jsonEncodeSymbolRendering)
+  SymbolRendering, runChangeInContext, catchUpCloning, jsonEncodeSymbolRendering)
 import Symbol exposing (
-  Environment, Change(..), SymbolRef(..),
-  environmentToJson )
+  Environment, Change(..), SymbolRef(..), environmentToJson )
+import Story exposing (
+  Story, emptyStory, jsonEncodeStory )
 
 myEnvironment : Environment
 myEnvironment =
@@ -37,10 +36,10 @@ myEnvironment =
     )
   ]}
 
-symbolRenderings : List SymbolRendering
-symbolRenderings = List.scanl (<|)
-  { blocks = [], rootId = Nothing }
-  [ runChangeInContext
+story : Story SymbolRendering
+story =
+  emptyStory { blocks = [], rootId = Nothing }
+  |> runChangeInContext
       { contextId = Nothing
       , change =
           SetRoot
@@ -48,19 +47,12 @@ symbolRenderings = List.scanl (<|)
             , symbolRef = SymbolIdAsRef "∞List"
             }
       }
-  , catchUpCloningInSymbolRendering myEnvironment "root"
-  , catchUpCloningInSymbolRendering myEnvironment "root/right"
-  , catchUpCloningInSymbolRendering myEnvironment "root/right/right"
-  ]
+  |> catchUpCloning myEnvironment "root"
+  |> catchUpCloning myEnvironment "root/right"
+  |> catchUpCloning myEnvironment "root/right/right"
 
-descriptionsInJson : Json.Encode.Value
-descriptionsInJson = Json.Encode.list []
-
-symbolRenderingsInJson : Json.Encode.Value
-symbolRenderingsInJson =
-  symbolRenderings
-  |> List.map jsonEncodeSymbolRendering
-  |> Json.Encode.list
+storyInJson : Json.Encode.Value
+storyInJson = story |> jsonEncodeStory jsonEncodeSymbolRendering
 
 environmentInJson : Json.Encode.Value
 environmentInJson = environmentToJson myEnvironment

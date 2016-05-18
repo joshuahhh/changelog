@@ -75,7 +75,7 @@ const SimpleSymbolDiagram = React.createClass({
                 <text
                     y={20}
                     style={{dominantBaseline: 'hanging', fontSize: 8}}>
-                  {cloning.nextChange + ' / ' + environment.symbols[cloning.symbolId].changes.length}
+                  {cloning.nextChangeIdx + ' / ' + environment.symbols[cloning.symbolId].changes.length}
                 </text>
               </g>
             </g>

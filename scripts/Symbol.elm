@@ -9,12 +9,22 @@ import JsonEncodeUtils
 -- Here's the static world of definitions; unrendered logs
 
 type alias SymbolId = String
+
 type SymbolRef = BareNode | SymbolIdAsRef SymbolId
+
+symbolRefToString : SymbolRef -> String
+symbolRefToString symbolRef =
+  case symbolRef of
+    BareNode               -> "bare node"
+    SymbolIdAsRef symbolId -> "clone of '" ++ symbolId ++ "'"
 
 type alias Cloning =
   { id : String
   , symbolRef : SymbolRef
   }
+
+cloningToString : Cloning -> String
+cloningToString { id, symbolRef } = (symbolRefToString symbolRef) ++ " (to be called '" ++ id ++ "')"
 
 type alias NodeId = String
 
@@ -25,6 +35,12 @@ type alias CompoundSymbol =
 type Change
   = SetRoot Cloning
   | AppendChild NodeId Cloning
+
+changeToString : Change -> String
+changeToString change =
+  case change of
+    SetRoot cloning -> "set root to " ++ (cloningToString cloning)
+    AppendChild nodeId cloning -> "append " ++ (cloningToString cloning) ++ " as new child of '" ++ nodeId ++ "'"
 
 type alias Environment =
   { symbols : Dict SymbolId CompoundSymbol }

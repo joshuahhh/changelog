@@ -1,6 +1,6 @@
 module Block (
   Block, BlockId, BlockBody(..), cloningToBlock, constructBlockId, jsonEncodeBlock,
-  incrementNextChangeOfCloning, setRootOfCloning, appendChildToNode ) where
+  incrementNextChangeIdxOfCloning, setRootOfCloning, appendChildToNode ) where
 
 import Json.Encode
 import JsonEncodeUtils
@@ -25,7 +25,7 @@ type alias NodeBody =
   { childIds: List BlockId }
 
 type alias CloningBody =
-  { rootId: Maybe BlockId, symbolId: Symbol.SymbolId, nextChange: Int }
+  { rootId: Maybe BlockId, symbolId: Symbol.SymbolId, nextChangeIdx: Int }
 
 constructBlockId : Maybe BlockId -> Symbol.NodeId -> BlockId
 constructBlockId maybeBlockId nodeId =
@@ -41,7 +41,7 @@ cloningToBlock cloning maybeOwnerId =
       Symbol.BareNode ->
         NodeBlockBody { childIds = [] }
       Symbol.SymbolIdAsRef symbolId ->
-        CloningBlockBody { rootId = Nothing, symbolId = symbolId, nextChange = 0 }
+        CloningBlockBody { rootId = Nothing, symbolId = symbolId, nextChangeIdx = 0 }
   in
     Block newId cloning.id maybeOwnerId newBody
 
@@ -70,13 +70,13 @@ type alias ChangeInContext =
   , contextId : Maybe BlockId
   }
 
-incrementNextChangeOfCloning : Block -> Block
-incrementNextChangeOfCloning block =
+incrementNextChangeIdxOfCloning : Block -> Block
+incrementNextChangeIdxOfCloning block =
   let
     oldCloningBody = case block.body of
       CloningBlockBody oldCloningBody -> oldCloningBody
-      _ -> Debug.crash "you can only increment `nextChange` of a cloning!"
-    newBody = CloningBlockBody { oldCloningBody | nextChange = oldCloningBody.nextChange + 1 }
+      _ -> Debug.crash "you can only increment `nextChangeIdx` of a cloning!"
+    newBody = CloningBlockBody { oldCloningBody | nextChangeIdx = oldCloningBody.nextChangeIdx + 1 }
   in
     { block | body = newBody }
 
@@ -92,9 +92,9 @@ jsonEncodeBlock {id, localId, ownerId, body} =
         [ ( "type", Json.Encode.string "node" )
         , ( "childIds", Json.Encode.list (List.map Json.Encode.string childIds) )
         ]
-      CloningBlockBody { rootId, symbolId, nextChange } ->
+      CloningBlockBody { rootId, symbolId, nextChangeIdx } ->
         [ ( "type", Json.Encode.string "cloning" )
         , ( "rootId", JsonEncodeUtils.maybeString rootId )
         , ( "symbolId", Json.Encode.string symbolId )
-        , ( "nextChange", Json.Encode.int nextChange )
+        , ( "nextChangeIdx", Json.Encode.int nextChangeIdx )
         ])
