@@ -1,10 +1,10 @@
-module Symbol ( SymbolId, NodeId, SymbolRef(..), Cloning, Change(..), CompoundSymbol, Environment, environmentToJson ) where
+module Symbol where
 
 import Array exposing ( Array )
 import Dict exposing ( Dict )
 import Json.Encode
 
-import JsonEncodeTools exposing ( jsonEncodeMappedDict )
+import JsonEncodeUtils
 
 -- Here's the static world of definitions; unrendered logs
 
@@ -34,7 +34,7 @@ environmentToJson environment =
   Json.Encode.object
     [ ( "symbols"
       , environment.symbols
-        |> jsonEncodeMappedDict symbolToJson
+        |> JsonEncodeUtils.mappedDict symbolToJson
       )
     ]
 
