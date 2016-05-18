@@ -5,7 +5,7 @@ import Dict
 import Array
 
 import SymbolRendering exposing (
-  SymbolRendering, runChangeInContext, catchUpCloning, jsonEncodeSymbolRendering)
+  SymbolRendering, runChangeInContextAsStep, catchUpCloning, jsonEncodeSymbolRendering)
 import Symbol exposing (
   Environment, Change(..), SymbolRef(..), environmentToJson )
 import Story exposing (
@@ -39,7 +39,7 @@ myEnvironment =
 story : Story SymbolRendering
 story =
   emptyStory { blocks = [], rootId = Nothing }
-  |> runChangeInContext
+  |> runChangeInContextAsStep
       { contextId = Nothing
       , change =
           SetRoot

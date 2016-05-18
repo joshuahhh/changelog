@@ -16,13 +16,11 @@ window.DemoInfinite = DemoInfinite;
 
 var App = React.createClass({
   render() {
-    // const symbolDiagram = group.clone('Top-Group').appendChild('Top-Group/group/node', group.clone('Bottom-Group'));
-    const {storyInJson, environmentInJson} = DemoGroupInGroup;
-    // const symbolDiagrams = symbolRenderingsInJson.map((symbolDiagramJson) =>
-    //   new SymbolDiagram(symbolDiagramJson.blocks, symbolDiagramJson.rootId));
+    // const {storyInJson, environmentInJson} = DemoGroupInGroup;
+    const {storyInJson, environmentInJson} = DemoInfinite;
 
     return (
-      <div style={{paddingTop: 20}}>
+      <div style={{paddingTop: 20, paddingLeft: 20}}>
         <Story
           story={storyInJson}
           characterRenderer={(symbolRendering =>
