@@ -52,8 +52,9 @@ story =
             , symbolRef = SymbolIdAsRef "Group"
             }
       }
-  |> catchUpCloning myEnvironment "group1"
-  |> catchUpCloning myEnvironment "group1/transform"
+      myEnvironment
+  |> catchUpCloning "group1" myEnvironment
+  |> catchUpCloning "group1/transform" myEnvironment
   |> runChangeInContextAsStep
       { contextId = Nothing
       , change =
@@ -63,7 +64,8 @@ story =
             , symbolRef = SymbolIdAsRef "Group"
             }
       }
-  |> catchUpCloning myEnvironment "group2"
+      myEnvironment
+  |> catchUpCloning "group2" myEnvironment
 
 storyInJson : Json.Encode.Value
 storyInJson = story |> jsonEncodeStory jsonEncodeSymbolRendering

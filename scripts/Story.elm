@@ -43,8 +43,9 @@ addStep : StoryStep a -> Story a -> Story a
 addStep storyStep story = { story | steps = story.steps ++ [ storyStep ] }
 
 -- An `advancer` takes an empty substory and advances it
-applyStep : Maybe String -> (Story a -> Story a) -> Story a -> Story a
-applyStep narration advancer story =
+-- `narrationMaker` takes the advanced substory and produces optional narration for it (often constant)
+applyStep : (Story a -> Maybe String) -> (Story a -> Story a) -> Story a -> Story a
+applyStep narrationMaker advancer story =
   let
     character = story |> outcome
     emptySubStory = emptyStory character
@@ -52,7 +53,7 @@ applyStep narration advancer story =
   in
     story
     |> addStep
-      { narration = narration
+      { narration = narrationMaker advancedSubStory
       , before = character
       , explanation = Explanation advancedSubStory
       , after = advancedSubStory |> outcome

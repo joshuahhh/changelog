@@ -8,16 +8,20 @@ import {SymbolDiagram} from '../SymbolDiagram';
 
 import ElmDemoGroupInGroup from 'exports?Elm!../DemoGroupInGroup';
 import ElmDemoInfinite from 'exports?Elm!../DemoInfinite';
+import ElmDemoAutoCatchUp from 'exports?Elm!../DemoAutoCatchUp';
 const DemoGroupInGroup = ElmDemoGroupInGroup.DemoGroupInGroup.make(ElmDemoGroupInGroup);
 const DemoInfinite = ElmDemoInfinite.DemoInfinite.make(ElmDemoInfinite);
+const DemoAutoCatchUp = ElmDemoAutoCatchUp.DemoAutoCatchUp.make(ElmDemoAutoCatchUp);
 window.DemoGroupInGroup = DemoGroupInGroup;
 window.DemoInfinite = DemoInfinite;
+window.DemoAutoCatchUp = DemoAutoCatchUp;
 
 
 var App = React.createClass({
   render() {
     // const {storyInJson, environmentInJson} = DemoGroupInGroup;
-    const {storyInJson, environmentInJson} = DemoInfinite;
+    // const {storyInJson, environmentInJson} = DemoInfinite;
+    const {storyInJson, environmentInJson} = DemoAutoCatchUp;
 
     return (
       <div style={{paddingTop: 20, paddingLeft: 20}}>

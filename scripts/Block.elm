@@ -1,11 +1,11 @@
 module Block (
   Block, BlockId, BlockBody(..), cloningToBlock, constructBlockId, jsonEncodeBlock,
-  incrementNextChangeIdxOfCloning, setRootOfCloning, appendChildToNode ) where
+  incrementNextChangeIdxOfCloning, setRootOfCloning, appendChildToNode, ownerHierarchy ) where
 
+import String
 import Json.Encode
-import JsonEncodeUtils
-import Symbol
 
+import JsonEncodeUtils
 import Symbol
 
 -- And here's the dynamic world of (partially) rendered logs
@@ -79,6 +79,16 @@ incrementNextChangeIdxOfCloning block =
     newBody = CloningBlockBody { oldCloningBody | nextChangeIdx = oldCloningBody.nextChangeIdx + 1 }
   in
     { block | body = newBody }
+
+ownerHierarchy : BlockId -> List BlockId
+ownerHierarchy blockId =
+  let
+    parts = blockId |> String.split "/"
+  in
+    [1..(List.length parts - 1)]
+    |> List.map (\ i ->
+      parts |> List.take i |> String.join "/"
+    )
 
 jsonEncodeBlock : Block -> Json.Encode.Value
 jsonEncodeBlock {id, localId, ownerId, body} =

@@ -1,4 +1,4 @@
-module DemoInfinite where
+module DemoAutoCatchUp where
 
 import Json.Encode
 import Dict
@@ -14,21 +14,26 @@ import Story exposing (
 myEnvironment : Environment
 myEnvironment =
   { symbols = Dict.fromList [
-    ( "∞List"
+    ( "Transform"
     , { changes = Array.fromList
         [ SetRoot (
-            { id = "pair"
+            { id = "node"
+            , symbolRef = BareNode
+            }
+          )
+        ]
+      }
+    ),
+    ( "Group",
+      { changes = Array.fromList
+        [ SetRoot (
+            { id = "node"
             , symbolRef = BareNode
             }
           ),
-          AppendChild "pair" (
-            { id = "left"
-            , symbolRef = BareNode
-            }
-          ),
-          AppendChild "pair" (
-            { id = "right"
-            , symbolRef = SymbolIdAsRef "∞List"
+          AppendChild "node" (
+            { id = "transform"
+            , symbolRef = SymbolIdAsRef "Transform"
             }
           )
         ]
@@ -43,14 +48,21 @@ story =
       { contextId = Nothing
       , change =
           SetRoot
-            { id = "root"
-            , symbolRef = SymbolIdAsRef "∞List"
+            { id = "group1"
+            , symbolRef = SymbolIdAsRef "Group"
             }
       }
       myEnvironment
-  |> catchUpCloning "root" myEnvironment
-  |> catchUpCloning "root/right" myEnvironment
-  |> catchUpCloning "root/right/right" myEnvironment
+  |> runChangeInContextAsStep
+      { contextId = Nothing
+      , change =
+          AppendChild
+            "group1/transform/node"
+            { id = "transformChild"
+            , symbolRef = BareNode
+            }
+      }
+      myEnvironment
 
 storyInJson : Json.Encode.Value
 storyInJson = story |> jsonEncodeStory jsonEncodeSymbolRendering

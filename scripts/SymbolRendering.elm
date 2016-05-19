@@ -9,7 +9,7 @@ import Util exposing ( mapWhen, idIs, find, unwrapOrCrash )
 import JsonEncodeUtils
 import Block exposing (
   Block, BlockId, BlockBody(..), cloningToBlock, constructBlockId, jsonEncodeBlock,
-  incrementNextChangeIdxOfCloning, setRootOfCloning, appendChildToNode )
+  incrementNextChangeIdxOfCloning, setRootOfCloning, appendChildToNode, ownerHierarchy )
 import Symbol exposing ( SymbolId, NodeId, SymbolRef(..), Cloning, Change(..),
   Environment, changeToString )
 import Story exposing ( Story, outcome, applyStep, applySimpleStep )
@@ -21,9 +21,11 @@ type alias SymbolRendering =
   , rootId : Maybe BlockId
   }
 
+type alias ContextId = Maybe BlockId
+
 type alias ChangeInContext =
   { change : Change
-  , contextId : Maybe BlockId
+  , contextId : ContextId
   }
 
 changeInContextToString : ChangeInContext -> String
@@ -36,8 +38,8 @@ changeInContextToString { change, contextId } =
   in
     contextPart ++ (changeToString change)
 
-runSetRoot : Cloning -> Maybe BlockId -> Story SymbolRendering -> Story SymbolRendering
-runSetRoot cloning contextId =
+runSetRoot : Cloning -> Maybe BlockId -> Environment -> Story SymbolRendering -> Story SymbolRendering
+runSetRoot cloning contextId environment =
   applySimpleStep Nothing (\ symbolRendering ->
     let
       newBlock = cloningToBlock cloning contextId
@@ -59,23 +61,34 @@ runSetRoot cloning contextId =
       newSymbolRendering
   )
 
-runAppendChild : NodeId -> Cloning -> Maybe BlockId -> Story SymbolRendering -> Story SymbolRendering
-runAppendChild nodeId cloning contextId =
-  applySimpleStep Nothing (\ symbolRendering ->
-    let
-      newBlock = cloningToBlock cloning contextId
-      blockIdOfParent = constructBlockId contextId nodeId
-      newBlocks = newBlock ::
-        mapWhen
-          (idIs blockIdOfParent)
-          (appendChildToNode (constructBlockId contextId cloning.id))
-          symbolRendering.blocks
-      newSymbolRendering = { symbolRendering | blocks = newBlocks }
-    in
-      newSymbolRendering
-  )
+runAppendChild : NodeId -> Cloning -> ContextId -> Environment -> Story SymbolRendering -> Story SymbolRendering
+runAppendChild nodeId cloning contextId environment story =
+  let
+    newBlock = cloningToBlock cloning contextId
+    blockIdOfParent = constructBlockId contextId nodeId
+    caughtUpStory = catchUpNode blockIdOfParent contextId environment story
+    narration =
+      if caughtUpStory == story then
+        Nothing
+      else
+        Just "and now the intended operation"
+  in
+    applySimpleStep
+      narration
+      (\ symbolRendering ->
+        let
+          newBlocks = newBlock ::
+            mapWhen
+              (idIs blockIdOfParent)
+              (appendChildToNode (constructBlockId contextId cloning.id))
+              symbolRendering.blocks
+          newSymbolRendering = { symbolRendering | blocks = newBlocks }
+        in
+          newSymbolRendering
+      )
+      caughtUpStory
 
-runChangeInContext : ChangeInContext -> Story SymbolRendering -> Story SymbolRendering
+runChangeInContext : ChangeInContext -> Environment -> Story SymbolRendering -> Story SymbolRendering
 runChangeInContext { change, contextId } =
   case change of
     SetRoot cloning ->
@@ -83,9 +96,11 @@ runChangeInContext { change, contextId } =
     AppendChild nodeId cloning ->
       runAppendChild nodeId cloning contextId
 
-runChangeInContextAsStep : ChangeInContext -> Story SymbolRendering -> Story SymbolRendering
-runChangeInContextAsStep changeInContext =
-  applyStep (Just (changeInContextToString changeInContext)) (runChangeInContext changeInContext)
+runChangeInContextAsStep : ChangeInContext -> Environment -> Story SymbolRendering -> Story SymbolRendering
+runChangeInContextAsStep changeInContext environment =
+  applyStep
+    (always <| Just (changeInContextToString changeInContext))
+    (runChangeInContext changeInContext environment)
 
 incrementNextChangeOfCloningInSymbolRendering : BlockId -> SymbolRendering -> SymbolRendering
 incrementNextChangeOfCloningInSymbolRendering blockId symbolRendering =
@@ -94,12 +109,25 @@ incrementNextChangeOfCloningInSymbolRendering blockId symbolRendering =
         mapWhen (idIs blockId) incrementNextChangeIdxOfCloning
   }
 
-catchUpCloning : Environment -> BlockId -> Story SymbolRendering -> Story SymbolRendering
-catchUpCloning environment blockId =
-  applyStep (Just ("catch up cloning '" ++ blockId ++ "'")) (catchUpCloningHelper environment blockId)
+catchUpNode : BlockId -> ContextId -> Environment -> Story SymbolRendering -> Story SymbolRendering
+catchUpNode blockId contextId environment story =
+  let
+    allCloningIds = blockId |> ownerHierarchy
+    cloningIdsToCheck =
+      case contextId of
+        Just contextId -> allCloningIds |> List.filter (\ owner -> contextId |> String.startsWith owner |> not)
+        Nothing -> allCloningIds
+  in
+    List.foldl (\ cloningId story -> catchUpCloning cloningId environment story) story cloningIdsToCheck
 
-catchUpCloningHelper : Environment -> BlockId -> Story SymbolRendering -> Story SymbolRendering
-catchUpCloningHelper environment blockId story =
+catchUpCloning : BlockId -> Environment -> Story SymbolRendering -> Story SymbolRendering
+catchUpCloning blockId environment =
+  applyStep
+    (\ story -> if List.isEmpty story.steps then Nothing else Just ("catch up cloning '" ++ blockId ++ "'"))
+    (catchUpCloningHelper blockId environment)
+
+catchUpCloningHelper : BlockId -> Environment -> Story SymbolRendering -> Story SymbolRendering
+catchUpCloningHelper blockId environment story =
   let
     symbolRendering = outcome story
     block = find (idIs blockId) symbolRendering.blocks |> unwrapOrCrash (String.join "\n"
@@ -126,10 +154,12 @@ catchUpCloningHelper environment blockId story =
         changeNarration = "catch-up step " ++ (toString nextChangeIdx) ++ ":\n" ++ (changeInContextToString changeInContext)
       in
         story
-        |> applyStep (Just changeNarration) (
-          runChangeInContext changeInContext
-          << applySimpleStep Nothing (incrementNextChangeOfCloningInSymbolRendering blockId))
-        |> catchUpCloningHelper environment blockId
+        |> applyStep
+          (always <| Just changeNarration)
+          (  runChangeInContext changeInContext environment
+          >> applySimpleStep Nothing (incrementNextChangeOfCloningInSymbolRendering blockId)
+          )
+        |> catchUpCloningHelper blockId environment
 
 jsonEncodeSymbolRendering : SymbolRendering -> Json.Encode.Value
 jsonEncodeSymbolRendering symbolRendering =
