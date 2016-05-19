@@ -43,14 +43,14 @@ story =
       { contextId = Nothing
       , change =
           SetRoot
-            { id = "root"
+            { id = "myRoot"
             , symbolRef = SymbolIdAsRef "∞List"
             }
       }
       myEnvironment
-  |> catchUpCloning "root" myEnvironment
-  |> catchUpCloning "root/right" myEnvironment
-  |> catchUpCloning "root/right/right" myEnvironment
+  |> catchUpCloning "myRoot" myEnvironment
+  |> catchUpCloning "myRoot/right" myEnvironment
+  |> catchUpCloning "myRoot/right/right" myEnvironment
 
 storyInJson : Json.Encode.Value
 storyInJson = story |> jsonEncodeStory jsonEncodeSymbolRendering

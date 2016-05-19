@@ -12,7 +12,7 @@ import Block exposing (
   incrementNextChangeIdxOfCloning, setRootOfCloning, appendChildToNode, ownerHierarchy )
 import Symbol exposing ( SymbolId, NodeId, SymbolRef(..), Cloning, Change(..),
   Environment, changeToString )
-import Story exposing ( Story, outcome, applyStep, applySimpleStep )
+import Story exposing ( Story, outcome, applyStep, applySimpleStep, addStep, Explanation(..), emptyStory )
 
 -- And here's the dynamic world of (partially) rendered logs
 
@@ -68,7 +68,7 @@ runAppendChild nodeId cloning contextId environment story =
     blockIdOfParent = constructBlockId contextId nodeId
     caughtUpStory = catchUpNode blockIdOfParent contextId environment story
     narration =
-      if caughtUpStory == story then
+      if List.isEmpty caughtUpStory.steps then
         Nothing
       else
         Just "and now the intended operation"
@@ -121,10 +121,19 @@ catchUpNode blockId contextId environment story =
     List.foldl (\ cloningId story -> catchUpCloning cloningId environment story) story cloningIdsToCheck
 
 catchUpCloning : BlockId -> Environment -> Story SymbolRendering -> Story SymbolRendering
-catchUpCloning blockId environment =
-  applyStep
-    (\ story -> if List.isEmpty story.steps then Nothing else Just ("catch up cloning '" ++ blockId ++ "'"))
-    (catchUpCloningHelper blockId environment)
+catchUpCloning blockId environment story =
+  let
+    subStory = catchUpCloningHelper blockId environment (emptyStory (outcome story))
+  in
+    if List.isEmpty subStory.steps then
+      story
+    else
+      story
+      |> addStep
+        { narration = Just ("catch up cloning '" ++ blockId ++ "'")
+        , before = outcome story
+        , explanation = Explanation subStory
+        , after = outcome subStory }
 
 catchUpCloningHelper : BlockId -> Environment -> Story SymbolRendering -> Story SymbolRendering
 catchUpCloningHelper blockId environment story =
@@ -151,7 +160,9 @@ catchUpCloningHelper blockId environment story =
       let
         change = changes |> Array.get nextChangeIdx |> unwrapOrCrash "Could not find nextChangeIdx"
         changeInContext = { change = change, contextId = Just blockId }
-        changeNarration = "catch-up step " ++ (toString nextChangeIdx) ++ ":\n" ++ (changeInContextToString changeInContext)
+        changeNarration =
+          cloningBody.symbolId ++ " step " ++ (toString nextChangeIdx) ++ ":\n"
+          ++ (changeInContextToString changeInContext)
       in
         story
         |> applyStep

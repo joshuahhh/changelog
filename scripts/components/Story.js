@@ -33,7 +33,7 @@ const Story = ({story, characterRenderer, showStart}) =>
             </td>
             {storyIsNotEmpty(step.explanation) &&
               <td style={{textAlign: 'left', verticalAlign: 'top', paddingRight: 30, paddingBottom: 35}}>
-                <div style={{border: '1px solid gray', padding: 10}}>
+                <div style={{border: '1px solid gray', padding: 10, boxShadow: '0px 0px 10px lightgray'}}>
                   <Story story={step.explanation} characterRenderer={characterRenderer} />
                 </div>
               </td>

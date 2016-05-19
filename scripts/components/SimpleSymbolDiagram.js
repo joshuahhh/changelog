@@ -17,7 +17,7 @@ const SimpleSymbolDiagram = React.createClass({
     const style = {verticalAlign: 'top'};
 
     if (!symbolDiagram.rootId) {
-      return <span style={style}>[Empty]</span>;
+      return <span style={{fontStyle: 'italic', ...style}}>[Empty]</span>;
     }
 
     const then = +(new Date());

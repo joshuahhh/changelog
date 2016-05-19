@@ -17,7 +17,7 @@ myEnvironment =
     ( "Transform"
     , { changes = Array.fromList
         [ SetRoot (
-            { id = "node"
+            { id = "transformNode"
             , symbolRef = BareNode
             }
           )
@@ -27,11 +27,11 @@ myEnvironment =
     ( "Group",
       { changes = Array.fromList
         [ SetRoot (
-            { id = "node"
+            { id = "groupNode"
             , symbolRef = BareNode
             }
           ),
-          AppendChild "node" (
+          AppendChild "groupNode" (
             { id = "transform"
             , symbolRef = SymbolIdAsRef "Transform"
             }
@@ -59,7 +59,7 @@ story =
       { contextId = Nothing
       , change =
           AppendChild
-            "group1/node"
+            "group1/groupNode"
             { id = "group2"
             , symbolRef = SymbolIdAsRef "Group"
             }

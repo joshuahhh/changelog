@@ -70,12 +70,14 @@ changeToJson change =
         [ ( "type", Json.Encode.string "SetRoot" )
         , ( "cloningId", Json.Encode.string cloning.id )
         , ( "cloningSymbolId", symbolRefToJson cloning.symbolRef )
+        , ( "description", Json.Encode.string (changeToString change))
         ]
       AppendChild nodeId cloning ->
-        [ ( "type", Json.Encode.string "SetRoot" )
+        [ ( "type", Json.Encode.string "AppendChild" )
         , ( "nodeId", Json.Encode.string nodeId )
         , ( "cloningId", Json.Encode.string cloning.id )
         , ( "cloningSymbolId", symbolRefToJson cloning.symbolRef )
+        , ( "description", Json.Encode.string (changeToString change))
         ])
 
 symbolRefToJson : SymbolRef -> Json.Encode.Value
