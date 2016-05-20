@@ -1,5 +1,5 @@
 import React from 'react';
-import _ from 'underscore';
+// import _ from 'underscore';
 
 const nl2br = (text) => text.split('\n').map((line) =>
   <span>
@@ -8,8 +8,8 @@ const nl2br = (text) => text.split('\n').map((line) =>
   </span>
 );
 
-const storyIsNotEmpty = (story) =>
-  _.any(story.steps.map((step) => step.narration));
+// const storyIsNotEmpty = (story) =>
+//   _.any(story.steps.map((step) => step.narration));
 
 
 const Story = ({story, characterRenderer, showStart}) =>
@@ -21,7 +21,7 @@ const Story = ({story, characterRenderer, showStart}) =>
             start
           </td>
           <td style={{textAlign: 'left', verticalAlign: 'top', paddingRight: 30, paddingBottom: 35}}>
-            {characterRenderer(story.start)}
+            {characterRenderer(story.before)}
           </td>
         </tr>
       }
@@ -31,18 +31,14 @@ const Story = ({story, characterRenderer, showStart}) =>
             <td style={{textAlign: 'right', verticalAlign: 'top', paddingRight: 30}}>
               {nl2br(step.narration)}
             </td>
-            {storyIsNotEmpty(step.explanation) &&
-              <td style={{textAlign: 'left', verticalAlign: 'top', paddingRight: 30, paddingBottom: 35}}>
-                <div style={{border: '1px solid gray', padding: 10, boxShadow: '0px 0px 10px lightgray'}}>
-                  <Story story={step.explanation} characterRenderer={characterRenderer} />
+            <td style={{textAlign: 'left', verticalAlign: 'top', paddingRight: 30, paddingBottom: 35}}>
+              { step.subStory.steps.length > 0
+              ? <div style={{border: '1px solid gray', padding: 10, boxShadow: '0px 0px 10px lightgray'}}>
+                  <Story story={step.subStory} characterRenderer={characterRenderer} />
                 </div>
-              </td>
-            }
-            {!storyIsNotEmpty(step.explanation) &&
-              <td style={{textAlign: 'left', verticalAlign: 'top', paddingRight: 30, paddingBottom: 35}}>
-                {characterRenderer(step.after)}
-              </td>
-            }
+              : characterRenderer(step.subStory.after)
+              }
+            </td>
           </tr>
       )}
     </tbody>

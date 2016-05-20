@@ -12,7 +12,7 @@ import Block exposing (
   incrementNextChangeIdxOfCloning, setRootOfCloning, appendChildToNode, ownerHierarchy )
 import Symbol exposing ( SymbolId, NodeId, SymbolRef(..), Cloning, Change(..),
   Environment, changeToString )
-import Story exposing ( Story, outcome, applyStep, applySimpleStep, addStep, Explanation(..), emptyStory )
+import Story exposing ( Story )
 
 -- And here's the dynamic world of (partially) rendered logs
 
@@ -40,7 +40,7 @@ changeInContextToString { change, contextId } =
 
 runSetRoot : Cloning -> Maybe BlockId -> Environment -> Story SymbolRendering -> Story SymbolRendering
 runSetRoot cloning contextId environment =
-  applySimpleStep Nothing (\ symbolRendering ->
+  Story.map (\ symbolRendering ->
     let
       newBlock = cloningToBlock cloning contextId
       newBlocks = newBlock ::
@@ -62,31 +62,26 @@ runSetRoot cloning contextId environment =
   )
 
 runAppendChild : NodeId -> Cloning -> ContextId -> Environment -> Story SymbolRendering -> Story SymbolRendering
-runAppendChild nodeId cloning contextId environment story =
+runAppendChild nodeId cloning contextId environment =
   let
     newBlock = cloningToBlock cloning contextId
     blockIdOfParent = constructBlockId contextId nodeId
-    caughtUpStory = catchUpNode blockIdOfParent contextId environment story
-    narration =
-      if List.isEmpty caughtUpStory.steps then
-        Nothing
-      else
-        Just "and now the intended operation"
   in
-    applySimpleStep
-      narration
-      (\ symbolRendering ->
-        let
-          newBlocks = newBlock ::
-            mapWhen
-              (idIs blockIdOfParent)
-              (appendChildToNode (constructBlockId contextId cloning.id))
-              symbolRendering.blocks
-          newSymbolRendering = { symbolRendering | blocks = newBlocks }
-        in
-          newSymbolRendering
-      )
-      caughtUpStory
+    catchUpNode blockIdOfParent contextId environment
+    >>
+    Story.step "and now the intended operation" (Story.map (\ symbolRendering ->
+      let
+        newBlocks = newBlock ::
+          mapWhen
+            (idIs blockIdOfParent)
+            (appendChildToNode (constructBlockId contextId cloning.id))
+            symbolRendering.blocks
+        newSymbolRendering = { symbolRendering | blocks = newBlocks }
+      in
+        newSymbolRendering
+    ))
+    >>
+    Story.flattenLastIfLonesome
 
 runChangeInContext : ChangeInContext -> Environment -> Story SymbolRendering -> Story SymbolRendering
 runChangeInContext { change, contextId } =
@@ -98,8 +93,8 @@ runChangeInContext { change, contextId } =
 
 runChangeInContextAsStep : ChangeInContext -> Environment -> Story SymbolRendering -> Story SymbolRendering
 runChangeInContextAsStep changeInContext environment =
-  applyStep
-    (always <| Just (changeInContextToString changeInContext))
+  Story.step
+    (changeInContextToString changeInContext)
     (runChangeInContext changeInContext environment)
 
 incrementNextChangeOfCloningInSymbolRendering : BlockId -> SymbolRendering -> SymbolRendering
@@ -121,56 +116,46 @@ catchUpNode blockId contextId environment story =
     List.foldl (\ cloningId story -> catchUpCloning cloningId environment story) story cloningIdsToCheck
 
 catchUpCloning : BlockId -> Environment -> Story SymbolRendering -> Story SymbolRendering
-catchUpCloning blockId environment story =
-  let
-    subStory = catchUpCloningHelper blockId environment (emptyStory (outcome story))
-  in
-    if List.isEmpty subStory.steps then
-      story
-    else
-      story
-      |> addStep
-        { narration = Just ("catch up cloning '" ++ blockId ++ "'")
-        , before = outcome story
-        , explanation = Explanation subStory
-        , after = outcome subStory }
+catchUpCloning blockId environment =
+  Story.step ("catch up cloning '" ++ blockId ++ "'")
+    (catchUpCloningHelper blockId environment)
 
 catchUpCloningHelper : BlockId -> Environment -> Story SymbolRendering -> Story SymbolRendering
-catchUpCloningHelper blockId environment story =
-  let
-    symbolRendering = outcome story
-    block = find (idIs blockId) symbolRendering.blocks |> unwrapOrCrash (String.join "\n"
-      [ "Could not find block"
-      , toString blockId
-      , toString (List.map .id symbolRendering.blocks)
-      ])
-    cloningBody =
-      case block.body of
-        CloningBlockBody cloningBody -> cloningBody
-        _ -> Debug.crash "you can only catch up clonings!"
-    nextChangeIdx = cloningBody.nextChangeIdx
-    symbol = environment.symbols |> Dict.get cloningBody.symbolId |> unwrapOrCrash "Could not find symbol!"
-    changes = symbol.changes
-  in
-    if nextChangeIdx == Array.length changes then
-      -- we're caught up already!
-      story
-    else
-      -- catch up one change, then recurse
-      let
-        change = changes |> Array.get nextChangeIdx |> unwrapOrCrash "Could not find nextChangeIdx"
-        changeInContext = { change = change, contextId = Just blockId }
-        changeNarration =
-          cloningBody.symbolId ++ " step " ++ (toString nextChangeIdx) ++ ":\n"
-          ++ (changeInContextToString changeInContext)
-      in
-        story
-        |> applyStep
-          (always <| Just changeNarration)
-          (  runChangeInContext changeInContext environment
-          >> applySimpleStep Nothing (incrementNextChangeOfCloningInSymbolRendering blockId)
-          )
-        |> catchUpCloningHelper blockId environment
+catchUpCloningHelper blockId environment =
+  Story.do (\ symbolRendering ->
+    let
+      block = find (idIs blockId) symbolRendering.blocks |> unwrapOrCrash (String.join "\n"
+        [ "Could not find block"
+        , toString blockId
+        , toString (List.map .id symbolRendering.blocks)
+        ])
+      cloningBody =
+        case block.body of
+          CloningBlockBody cloningBody -> cloningBody
+          _ -> Debug.crash "you can only catch up clonings!"
+      nextChangeIdx = cloningBody.nextChangeIdx
+      symbol = environment.symbols |> Dict.get cloningBody.symbolId |> unwrapOrCrash "Could not find symbol!"
+      changes = symbol.changes
+    in
+      if nextChangeIdx == Array.length changes then
+        -- we're caught up already!
+        identity
+      else
+        -- catch up one change, then recurse
+        let
+          change = changes |> Array.get nextChangeIdx |> unwrapOrCrash "Could not find nextChangeIdx"
+          changeInContext = { change = change, contextId = Just blockId }
+          changeNarration =
+            cloningBody.symbolId ++ " step " ++ (toString nextChangeIdx) ++ ":\n"
+            ++ (changeInContextToString changeInContext)
+        in
+          Story.step changeNarration (
+            runChangeInContext changeInContext environment
+            >>
+            Story.map (incrementNextChangeOfCloningInSymbolRendering blockId))
+          >>
+          catchUpCloningHelper blockId environment
+  )
 
 jsonEncodeSymbolRendering : SymbolRendering -> Json.Encode.Value
 jsonEncodeSymbolRendering symbolRendering =

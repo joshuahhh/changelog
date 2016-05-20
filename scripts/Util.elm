@@ -24,3 +24,6 @@ unwrapOrCrash message maybeA =
   case maybeA of
     Just a  -> a
     Nothing -> Debug.crash message
+
+-- maybeApply : (b -> a -> a) -> Maybe b -> (a -> a)
+-- maybeApply f maybeB = maybeB |> Maybe.map f |> Maybe.withDefault identity

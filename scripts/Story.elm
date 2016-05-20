@@ -1,94 +1,104 @@
 module Story where
 
 import Json.Encode
-import List.Extra
 
-import JsonEncodeUtils
+import Util exposing ( unwrapOrCrash )
 
 
 type alias Story a =
-  { start : a
-  , steps : List (StoryStep a)
-  }
-
-type alias StoryStep a =
-  { narration : Maybe String
-  , before : a
-  , explanation : Explanation a
+  { before : a
+  , steps : List (Step a)
   , after : a
   }
 
-type Explanation a = Explanation (Story a)
+  -- if Nothing, then this is a secret, silent step
+type alias Narration = String
 
-emptyStory : a -> Story a
-emptyStory character =
-  { start = character
-  , steps = []
+type alias Step a =
+  { narration : Narration
+  , subStory : SubStory a
   }
 
-outcome : Story a -> a
-outcome story =
-  case List.Extra.last story.steps of
-    Just step -> step.after
-    Nothing -> story.start
+type SubStory a = SubStory (Story a)
 
-simpleStep : Maybe String -> a -> a -> StoryStep a
-simpleStep narration before after =
-  { narration = narration
-  , before = before
-  , explanation = Explanation { start = before, steps = [] }
-  , after = after }
+-- Here's the public API:
 
-addStep : StoryStep a -> Story a -> Story a
-addStep storyStep story = { story | steps = story.steps ++ [ storyStep ] }
+ending : Story a -> a
+ending story = story.after
 
--- An `advancer` takes an empty substory and advances it
--- `narrationMaker` takes the advanced substory and produces optional narration for it (often constant)
-applyStep : (Story a -> Maybe String) -> (Story a -> Story a) -> Story a -> Story a
-applyStep narrationMaker advancer story =
+start : a -> Story a
+start a = emptyStory_ a
+
+do : (a -> (Story a -> Story a)) -> (Story a -> Story a)
+do f story = f (ending story) story
+
+step : Narration -> (Story a -> Story a) -> (Story a -> Story a)
+step narration subStoryAdvancer story =
   let
-    character = story |> outcome
-    emptySubStory = emptyStory character
-    advancedSubStory = emptySubStory |> advancer
+    subStoryBefore = emptyStory_ (ending story)
+    subStoryAfter = subStoryAdvancer subStoryBefore
   in
-    story
-    |> addStep
-      { narration = narrationMaker advancedSubStory
-      , before = character
-      , explanation = Explanation advancedSubStory
-      , after = advancedSubStory |> outcome
-      }
+    story |> addStep_
+      { narration = narration
+      , subStory = SubStory subStoryAfter}
 
-applySimpleStep : Maybe String -> (a -> a) -> Story a -> Story a
-applySimpleStep narration transformer story =
-  let
-    character = story |> outcome
-    newCharacter = character |> transformer
-  in
+map : (a -> a) -> (Story a -> Story a)
+map mapper story =
+  { story | after = mapper story.after }
+
+flattenLastIfLonesome : Story a -> Story a
+flattenLastIfLonesome story =
+  if List.length story.steps == 1 then
+    story.steps |> List.head |> unwrapOrCrash "???" |> subStory_
+  else
     story
-    |> addStep (simpleStep narration character newCharacter)
+
+-- And here are utility functions:
+
+subStory_ : Step a -> Story a
+subStory_ { subStory } =
+  case subStory of SubStory subStory -> subStory  -- lolz
+
+-- "There once was a `character`. Nothing happened."
+emptyStory_ : a -> Story a
+emptyStory_ character =
+  { before = character
+  , steps = []
+  , after = character
+  }
+
+-- addStep adds a step to a story, and updates the story's ending to reflect the step's ending.
+addStep_ : Step a -> Story a -> Story a
+addStep_ step story =
+  { story
+  | steps = story.steps ++ [ step ]
+  , after = (step |> subStory_).after
+  }
 
 -- Given a way to encode characters, we can encode stories about those characters
 
 jsonEncodeStory : (a -> Json.Encode.Value) -> Story a -> Json.Encode.Value
 jsonEncodeStory jsonEncodeCharacter story =
-  [ ( "start", story.start |> jsonEncodeCharacter )
-  , ( "steps", story.steps |> jsonEncodeStorySteps jsonEncodeCharacter )
+  [ ( "before", story.before |> jsonEncodeCharacter )
+  , ( "steps", story.steps |> jsonEncodeSteps jsonEncodeCharacter )
+  , ( "after", story.after |> jsonEncodeCharacter )
   ]
   |> Json.Encode.object
 
-jsonEncodeStorySteps : (a -> Json.Encode.Value) -> List (StoryStep a) -> Json.Encode.Value
-jsonEncodeStorySteps jsonEncodeCharacter storySteps =
-  storySteps |> List.map (jsonEncodeStoryStep jsonEncodeCharacter) |> Json.Encode.list
+jsonEncodeSteps : (a -> Json.Encode.Value) -> List (Step a) -> Json.Encode.Value
+jsonEncodeSteps jsonEncodeCharacter steps =
+  steps |> List.map (jsonEncodeStep jsonEncodeCharacter) |> Json.Encode.list
 
-jsonEncodeStoryStep : (a -> Json.Encode.Value) -> StoryStep a -> Json.Encode.Value
-jsonEncodeStoryStep jsonEncodeCharacter storyStep =
-  [ ( "narration",   storyStep.narration   |> JsonEncodeUtils.maybeString )
-  , ( "before",      storyStep.before      |> jsonEncodeCharacter )
-  , ( "explanation", storyStep.explanation |> jsonEncodeExplanation jsonEncodeCharacter )
-  , ( "after",       storyStep.after       |> jsonEncodeCharacter ) ]
+jsonEncodeStep : (a -> Json.Encode.Value) -> Step a -> Json.Encode.Value
+jsonEncodeStep jsonEncodeCharacter step =
+  [ ( "narration", step.narration |> jsonEncodeNarration )
+  , ( "subStory",  step.subStory  |> jsonEncodeSubStory jsonEncodeCharacter )
+  ]
   |> Json.Encode.object
 
-jsonEncodeExplanation : (a -> Json.Encode.Value) -> Explanation a -> Json.Encode.Value
-jsonEncodeExplanation jsonEncodeCharacter (Explanation story) =
+jsonEncodeNarration : Narration -> Json.Encode.Value
+jsonEncodeNarration = Json.Encode.string  -- JsonEncodeUtils.maybeString
+
+jsonEncodeSubStory : (a -> Json.Encode.Value) -> SubStory a -> Json.Encode.Value
+jsonEncodeSubStory jsonEncodeCharacter (SubStory story) =
   jsonEncodeStory jsonEncodeCharacter story

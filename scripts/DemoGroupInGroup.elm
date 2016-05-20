@@ -8,8 +8,7 @@ import SymbolRendering exposing (
   SymbolRendering, runChangeInContextAsStep, catchUpCloning, jsonEncodeSymbolRendering)
 import Symbol exposing (
   Environment, Change(..), SymbolRef(..), environmentToJson )
-import Story exposing (
-  Story, emptyStory, jsonEncodeStory )
+import Story exposing ( Story )
 
 myEnvironment : Environment
 myEnvironment =
@@ -43,7 +42,7 @@ myEnvironment =
 
 story : Story SymbolRendering
 story =
-  emptyStory { blocks = [], rootId = Nothing }
+  Story.start { blocks = [], rootId = Nothing }
   |> runChangeInContextAsStep
       { contextId = Nothing
       , change =
@@ -68,7 +67,7 @@ story =
   |> catchUpCloning "group2" myEnvironment
 
 storyInJson : Json.Encode.Value
-storyInJson = story |> jsonEncodeStory jsonEncodeSymbolRendering
+storyInJson = story |> Story.jsonEncodeStory jsonEncodeSymbolRendering
 
 environmentInJson : Json.Encode.Value
 environmentInJson = environmentToJson myEnvironment
