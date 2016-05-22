@@ -40,4 +40,5 @@ collatzToOne =
       collatz
       >> collatzToOne)
 
+a : Json.Encode.Value
 a = Debug.log "yayaya" (Story.start 3 |> collatzToOne |> Story.jsonEncodeStory Json.Encode.int)

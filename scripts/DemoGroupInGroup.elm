@@ -44,7 +44,7 @@ story : Story SymbolRendering
 story =
   Story.start { blocks = [], rootId = Nothing }
   |> runChangeInContextAsStep
-      { contextId = Nothing
+      { changeContext = Nothing
       , change =
           SetRoot
             { id = "group1"
@@ -55,7 +55,7 @@ story =
   |> catchUpCloning "group1" myEnvironment
   |> catchUpCloning "group1/transform" myEnvironment
   |> runChangeInContextAsStep
-      { contextId = Nothing
+      { changeContext = Nothing
       , change =
           AppendChild
             "group1/groupNode"

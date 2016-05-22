@@ -21,30 +21,35 @@ type alias SymbolRendering =
   , rootId : Maybe BlockId
   }
 
-type alias ContextId = Maybe BlockId
+-- To apply a symbol's change in a cloning of that symbol (in a symbol
+-- rendering), you need to know which cloning you're working with, so you know
+-- how to resolve the cloning-specific IDs into symbol-rendering IDs. You refer
+-- to that with a ChangeContext. A ChangeContext of Nothing means that you're
+-- working wit hthe symbol-rendering's root context – outside of any clonings.
+type alias ChangeContext = Maybe BlockId
 
 type alias ChangeInContext =
   { change : Change
-  , contextId : ContextId
+  , changeContext : ChangeContext
   }
 
 changeInContextToString : ChangeInContext -> String
-changeInContextToString { change, contextId } =
+changeInContextToString { change, changeContext } =
   let
     contextPart =
-      case contextId of
-        Just contextId -> "in '" ++ contextId ++ "', "
+      case changeContext of
+        Just changeContext -> "in '" ++ changeContext ++ "', "
         Nothing        -> "in root context, "
   in
     contextPart ++ (changeToString change)
 
 runSetRoot : Cloning -> Maybe BlockId -> Environment -> Story SymbolRendering -> Story SymbolRendering
-runSetRoot cloning contextId environment =
+runSetRoot cloning changeContext environment =
   Story.map (\ symbolRendering ->
     let
-      newBlock = cloningToBlock cloning contextId
+      newBlock = cloningToBlock cloning changeContext
       newBlocks = newBlock ::
-        case contextId of
+        case changeContext of
           Just blockId ->
             mapWhen
               (idIs blockId)
@@ -53,7 +58,7 @@ runSetRoot cloning contextId environment =
           Nothing ->
             symbolRendering.blocks
       newRootId =
-        case contextId of
+        case changeContext of
           Just blockId -> symbolRendering.rootId
           Nothing -> Just cloning.id
       newSymbolRendering = { symbolRendering | blocks = newBlocks, rootId = newRootId }
@@ -61,20 +66,20 @@ runSetRoot cloning contextId environment =
       newSymbolRendering
   )
 
-runAppendChild : NodeId -> Cloning -> ContextId -> Environment -> Story SymbolRendering -> Story SymbolRendering
-runAppendChild nodeId cloning contextId environment =
+runAppendChild : NodeId -> Cloning -> ChangeContext -> Environment -> Story SymbolRendering -> Story SymbolRendering
+runAppendChild nodeId cloning changeContext environment =
   let
-    newBlock = cloningToBlock cloning contextId
-    blockIdOfParent = constructBlockId contextId nodeId
+    newBlock = cloningToBlock cloning changeContext
+    blockIdOfParent = constructBlockId changeContext nodeId
   in
-    catchUpNode blockIdOfParent contextId environment
+    catchUpNode blockIdOfParent changeContext environment
     >>
     Story.step "and now the intended operation" (Story.map (\ symbolRendering ->
       let
         newBlocks = newBlock ::
           mapWhen
             (idIs blockIdOfParent)
-            (appendChildToNode (constructBlockId contextId cloning.id))
+            (appendChildToNode (constructBlockId changeContext cloning.id))
             symbolRendering.blocks
         newSymbolRendering = { symbolRendering | blocks = newBlocks }
       in
@@ -84,12 +89,12 @@ runAppendChild nodeId cloning contextId environment =
     Story.flattenLastIfLonesome
 
 runChangeInContext : ChangeInContext -> Environment -> Story SymbolRendering -> Story SymbolRendering
-runChangeInContext { change, contextId } =
+runChangeInContext { change, changeContext } =
   case change of
     SetRoot cloning ->
-      runSetRoot cloning contextId
+      runSetRoot cloning changeContext
     AppendChild nodeId cloning ->
-      runAppendChild nodeId cloning contextId
+      runAppendChild nodeId cloning changeContext
 
 runChangeInContextAsStep : ChangeInContext -> Environment -> Story SymbolRendering -> Story SymbolRendering
 runChangeInContextAsStep changeInContext environment =
@@ -104,13 +109,13 @@ incrementNextChangeOfCloningInSymbolRendering blockId symbolRendering =
         mapWhen (idIs blockId) incrementNextChangeIdxOfCloning
   }
 
-catchUpNode : BlockId -> ContextId -> Environment -> Story SymbolRendering -> Story SymbolRendering
-catchUpNode blockId contextId environment story =
+catchUpNode : BlockId -> ChangeContext -> Environment -> Story SymbolRendering -> Story SymbolRendering
+catchUpNode blockId changeContext environment story =
   let
     allCloningIds = blockId |> ownerHierarchy
     cloningIdsToCheck =
-      case contextId of
-        Just contextId -> allCloningIds |> List.filter (\ owner -> contextId |> String.startsWith owner |> not)
+      case changeContext of
+        Just changeContext -> allCloningIds |> List.filter (\ owner -> changeContext |> String.startsWith owner |> not)
         Nothing -> allCloningIds
   in
     List.foldl (\ cloningId story -> catchUpCloning cloningId environment story) story cloningIdsToCheck
@@ -144,7 +149,7 @@ catchUpCloningHelper blockId environment =
         -- catch up one change, then recurse
         let
           change = changes |> Array.get nextChangeIdx |> unwrapOrCrash "Could not find nextChangeIdx"
-          changeInContext = { change = change, contextId = Just blockId }
+          changeInContext = { change = change, changeContext = Just blockId }
           changeNarration =
             cloningBody.symbolId ++ " step " ++ (toString nextChangeIdx) ++ ":\n"
             ++ (changeInContextToString changeInContext)

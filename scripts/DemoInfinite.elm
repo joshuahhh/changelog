@@ -39,7 +39,7 @@ story : Story SymbolRendering
 story =
   Story.start { blocks = [], rootId = Nothing }
   |> runChangeInContextAsStep
-      { contextId = Nothing
+      { changeContext = Nothing
       , change =
           SetRoot
             { id = "myRoot"
