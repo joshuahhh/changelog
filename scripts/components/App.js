@@ -8,12 +8,15 @@ import Story from './Story';
 
 import {SymbolDiagram} from '../SymbolDiagram';
 
-import ElmDemoGroupInGroup from 'exports?Elm!../DemoGroupInGroup';
-import ElmDemoInfinite from 'exports?Elm!../DemoInfinite';
-import ElmDemoAutoCatchUp from 'exports?Elm!../DemoAutoCatchUp';
-const GroupInGroup = ElmDemoGroupInGroup.DemoGroupInGroup.make(ElmDemoGroupInGroup);
-const Infinite = ElmDemoInfinite.DemoInfinite.make(ElmDemoInfinite);
-const AutoCatchUp = ElmDemoAutoCatchUp.DemoAutoCatchUp.make(ElmDemoAutoCatchUp);
+import ElmDemoGroupInGroup from '../DemoGroupInGroup';
+import ElmDemoInfinite from '../DemoInfinite';
+import ElmDemoAutoCatchUp from '../DemoAutoCatchUp';
+const GroupInGroup = ElmDemoGroupInGroup.DemoGroupInGroup.make({});
+const Infinite = ElmDemoInfinite.DemoInfinite.make({});
+const AutoCatchUp = ElmDemoAutoCatchUp.DemoAutoCatchUp.make({});
+_.extend(window, {GroupInGroup, Infinite, AutoCatchUp});
+
+
 const demos = [{
   name: 'GroupInGroup',
   data: GroupInGroup,
@@ -43,6 +46,8 @@ var App = React.createClass({
 
     const demo = _.find(demos, {name: demoName});
     const {storyInJson, environmentInJson} = demo.data;
+
+    window.storyInJson = storyInJson;
 
     return (
       <div style={{paddingTop: 20, paddingLeft: 20}}>

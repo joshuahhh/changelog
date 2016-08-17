@@ -51,7 +51,7 @@ module.exports = {
     { test: /\.svg(\?v=\d+\.\d+\.\d+)?$/,    loader: "url?limit=10000&mimetype=image/svg+xml" },
     {
       test: /\.elm$/,
-      loader: 'elm-webpack'
+      loader: 'exports?Elm!elm-webpack'
     }],
     noParse: /\.elm$/
   }
